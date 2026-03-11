@@ -11,15 +11,15 @@
   		"<all_urls>"
 	],
 	"web_accessible_resources": [{
-		"resources": ["scripts/*.js"],
+		"resources": ["web_accessible/**/*"],
 		"matches": ["<all_urls>"]
 	}],
 	"action": {
 		"default_popup": "popup.html",
 		"default_icon": {
-			"16": "icons/icon.png",
-			"48": "icons/icon.png",
-			"128": "icons/icon.png"
+			"16": "icon.png",
+			"48": "icon.png",
+			"128": "icon.png"
 		}
 	},
 	"background": {
@@ -27,8 +27,8 @@
 		"type": "module"
 	},
 	"icons": {
-		"16": "icons/icon.png",
-		"48": "icons/icon.png",
-		"128": "icons/icon.png"
+		"16": "icon.png",
+		"48": "icon.png",
+		"128": "icon.png"
 	}
 }
