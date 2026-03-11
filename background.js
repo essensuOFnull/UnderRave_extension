@@ -1,4 +1,5 @@
 import * as tv from './backgrounds/tv.js';
+import * as adblock from './backgrounds/adblock.js';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'openFullscreen') {
