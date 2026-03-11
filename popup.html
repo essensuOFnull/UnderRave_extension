@@ -1,12 +1,9 @@
 <!DOCTYPE html>
-<html lang="ru">
+<html>
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<title>Русское ТВ</title>
-	<style>
-		/* --- все ваши стили без изменений --- */
-		* {
+    <meta charset="UTF-8">
+    <style>
+        * {
 			margin: 0;
 			padding: 0;
 			box-sizing: border-box;
@@ -125,30 +122,34 @@
 		.note strong {
 			color: #b85c1a;
 		}
-	</style>
+    </style>
 </head>
 <body>
-<div class="container">
-	<h1>📺 Некоторые русские телеканалы:</h1>
+    <div class="tabs">
+        <button class="tab-button active" data-tab="features">Функции</button>
+        <button class="tab-button" data-tab="tv">Русское ТВ</button>
+    </div>
 
-	<h2 style="margin-bottom: 1rem;">📡 Федеральные каналы</h2>
-	<div class="grid" id="federal-grid"></div>
+    <div id="features" class="tab-content active">
+        <h2>Что умеет расширение</h2>
+        <ul>
+            <li>📺 Просмотр ТВ в полноэкранном режиме (вкладка «Русское ТВ»)</li>
+            <li>✨ Другие функции будут добавляться...</li>
+        </ul>
+    </div>
 
-	<hr>
+    <div id="tv" class="tab-content">
+        <h1>📺 Некоторые русские телеканалы:</h1>
+		<h2 style="margin-bottom: 1rem;">📡 Федеральные каналы</h2>
+		<div class="grid" id="federal-grid"></div>
+		<hr>
+		<h2 style="margin-bottom: 1rem;">🎬 Популярные развлекательные</h2>
+		<div class="grid" id="entertain-grid"></div>
+		<hr>
+		<h2 style="margin-bottom: 1rem;">Прочие</h2>
+		<div class="grid" id="misc-grid"></div>
+    </div>
 
-	<h2 style="margin-bottom: 1rem;">🎬 Популярные развлекательные</h2>
-	<div class="grid" id="entertain-grid"></div>
-
-	<hr>
-
-	<h2 style="margin-bottom: 1rem;">Прочие</h2>
-	<div class="grid" id="misc-grid"></div>
-
-	<div style="margin-top: 1rem; color: #3f5570; font-size: 0.9rem; padding-left: 1rem;">
-		✅ Все ссылки проверены (март 2026) — ведут на официальные страницы трансляций
-	</div>
-</div>
-
-<script src="popup.js"></script>
+    <script src="popup.js"></script>
 </body>
 </html>
