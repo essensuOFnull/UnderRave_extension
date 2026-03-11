@@ -1,4 +1,4 @@
-import * as tv from './modules/tv.js';
+import * as tv from './backgrounds/tv.js';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'openFullscreen') {
@@ -7,7 +7,7 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 /*открытие вкладки расширения по клику на иконку*/
 chrome.action.onClicked.addListener((tab) => {
-    const extensionPageUrl = chrome.runtime.getURL('popup.html');
+    const extensionPageUrl = chrome.runtime.getURL('index.html');
     chrome.tabs.query({ url: extensionPageUrl }, (tabs) => {
         if (tabs.length > 0) {
             // Вкладка уже открыта – делаем её активной
