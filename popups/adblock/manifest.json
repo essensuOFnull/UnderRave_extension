@@ -4,11 +4,7 @@
    "minimum_chrome_version": "122.0",
    "name": "__MSG_extName666__",
    "optional_host_permissions": [ "\u003Call_urls>" ],
-   "options_page": "dashboard.html",
    "short_name": "AdBlock Max",
-   "storage": {
-      "managed_schema": "managed_storage.json"
-   },
    "update_url": "https://clients2.google.com/service/update2/crx",
    "version": "1.0.13",
    "web_accessible_resources": [ {

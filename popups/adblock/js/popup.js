@@ -342,9 +342,6 @@ async function init() {
     renderAdminRules();
 
     setFilteringMode(popupPanelData.level);
-
-    dom.text('#hostname', punycode.toUnicode(tabURL.hostname));
-    dom.text('#titlecontent', chrome.runtime.getManifest().name);
     
     dom.cl.toggle('#showMatchedRules', 'enabled',
         popupPanelData.isSideloaded === true &&

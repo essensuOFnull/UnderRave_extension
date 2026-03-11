@@ -18,7 +18,6 @@
 
     Home: https://github.com/gorhill/uBlock
 */
-
 import {
     TAB_ID_NONE,
     browser,
@@ -60,7 +59,7 @@ function getRulesetDetails() {
     if ( getRulesetDetails.rulesetDetailsPromise !== undefined ) {
         return getRulesetDetails.rulesetDetailsPromise;
     }
-    getRulesetDetails.rulesetDetailsPromise = fetchJSON('/rulesets/ruleset-details').then(entries => {
+    getRulesetDetails.rulesetDetailsPromise = fetchJSON('/popups/adblock/rulesets/ruleset-details').then(entries => {
         const rulesMap = new Map(
             entries.map(entry => [ entry.id, entry ])
         );
