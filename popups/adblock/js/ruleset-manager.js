@@ -128,7 +128,7 @@ async function updateRegexRules(currentRules, addRules, removeRuleIds) {
     const toFetch = [];
     for ( const details of rulesetDetails ) {
         if ( details.rules.regex === 0 ) { continue; }
-        toFetch.push(fetchJSON(`/rulesets/regex/${details.id}`));
+        toFetch.push(fetchJSON(`/popups/adblock/rulesets/regex/${details.id}`));
     }
     const regexRulesets = await Promise.all(toFetch);
 
@@ -171,7 +171,7 @@ async function updateRemoveparamRules(currentRules, addRules, removeRuleIds) {
     const toFetch = [];
     for ( const details of rulesetDetails ) {
         if ( details.rules.removeparam === 0 ) { continue; }
-        toFetch.push(fetchJSON(`/rulesets/removeparam/${details.id}`));
+        toFetch.push(fetchJSON(`/popups/adblock/rulesets/removeparam/${details.id}`));
     }
     const removeparamRulesets = await Promise.all(toFetch);
 
@@ -216,7 +216,7 @@ async function updateRedirectRules(currentRules, addRules, removeRuleIds) {
     const toFetch = [];
     for ( const details of rulesetDetails ) {
         if ( details.rules.redirect === 0 ) { continue; }
-        toFetch.push(fetchJSON(`/rulesets/redirect/${details.id}`));
+        toFetch.push(fetchJSON(`/popups/adblock/rulesets/redirect/${details.id}`));
     }
     const redirectRulesets = await Promise.all(toFetch);
 
@@ -260,7 +260,7 @@ async function updateModifyHeadersRules(currentRules, addRules, removeRuleIds) {
     const toFetch = [];
     for ( const details of rulesetDetails ) {
         if ( details.rules.modifyHeaders === 0 ) { continue; }
-        toFetch.push(fetchJSON(`/rulesets/modify-headers/${details.id}`));
+        toFetch.push(fetchJSON(`/popups/adblock/rulesets/modify-headers/${details.id}`));
     }
     const rulesets = await Promise.all(toFetch);
 
@@ -364,7 +364,7 @@ async function updateStrictBlockRules(currentRules, addRules, removeRuleIds) {
     const toFetch = [];
     for ( const details of rulesetDetails ) {
         if ( details.rules.strictblock === 0 ) { continue; }
-        toFetch.push(fetchJSON(`/rulesets/strictblock/${details.id}`));
+        toFetch.push(fetchJSON(`/popups/adblock/rulesets/strictblock/${details.id}`));
     }
     const rulesets = await Promise.all(toFetch);
 

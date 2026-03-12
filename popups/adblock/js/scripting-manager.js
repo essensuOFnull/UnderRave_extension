@@ -36,7 +36,7 @@ const resourceDetailPromises = new Map();
 function getScriptletDetails() {
     let promise = resourceDetailPromises.get('scriptlet');
     if ( promise !== undefined ) { return promise; }
-    promise = fetchJSON('/rulesets/scriptlet-details').then(
+    promise = fetchJSON('/popups/adblock/rulesets/scriptlet-details').then(
         entries => new Map(entries)
     );
     resourceDetailPromises.set('scriptlet', promise);
@@ -46,7 +46,7 @@ function getScriptletDetails() {
 function getGenericDetails() {
     let promise = resourceDetailPromises.get('generic');
     if ( promise !== undefined ) { return promise; }
-    promise = fetchJSON('/rulesets/generic-details').then(
+    promise = fetchJSON('/popups/adblock/rulesets/generic-details').then(
         entries => new Map(entries)
     );
     resourceDetailPromises.set('generic', promise);
@@ -103,7 +103,7 @@ function registerHighGeneric(context, genericDetails) {
         }
         const count = details.css?.generichigh || 0;
         if ( count === 0 ) { continue; }
-        css.push(`/rulesets/scripting/generichigh/${details.id}.css`);
+        css.push(`/popups/adblock/rulesets/scripting/generichigh/${details.id}.css`);
     }
 
     if ( css.length === 0 ) { return; }
@@ -175,12 +175,12 @@ function registerGeneric(context, genericDetails) {
         }
         const count = details.css?.generic || 0;
         if ( count === 0 ) { continue; }
-        js.push(`/rulesets/scripting/generic/${details.id}.js`);
+        js.push(`/popups/adblock/rulesets/scripting/generic/${details.id}.js`);
     }
 
     if ( js.length === 0 ) { return; }
 
-    js.push('/js/scripting/css-generic.js');
+    js.push('/popups/adblock/js/scripting/css-generic.js');
 
     const { none, basic, optimal, complete } = filteringModeDetails;
     const matches = [];
@@ -241,7 +241,7 @@ function registerProcedural(context) {
     for ( const rulesetDetails of rulesetsDetails ) {
         const count = rulesetDetails.css?.procedural || 0;
         if ( count === 0 ) { continue; }
-        js.push(`/rulesets/scripting/procedural/${rulesetDetails.id}.js`);
+        js.push(`/popups/adblock/rulesets/scripting/procedural/${rulesetDetails.id}.js`);
     }
     if ( js.length === 0 ) { return; }
 
@@ -252,7 +252,7 @@ function registerProcedural(context) {
     ];
     if ( matches.length === 0 ) { return; }
 
-    js.push('/js/scripting/css-procedural.js');
+    js.push('/popups/adblock/js/scripting/css-procedural.js');
 
     const excludeMatches = [];
     if ( none.has('all-urls') === false ) {
@@ -300,7 +300,7 @@ function registerDeclarative(context) {
     for ( const rulesetDetails of rulesetsDetails ) {
         const count = rulesetDetails.css?.declarative || 0;
         if ( count === 0 ) { continue; }
-        js.push(`/rulesets/scripting/declarative/${rulesetDetails.id}.js`);
+        js.push(`/popups/adblock/rulesets/scripting/declarative/${rulesetDetails.id}.js`);
     }
     if ( js.length === 0 ) { return; }
 
@@ -311,7 +311,7 @@ function registerDeclarative(context) {
     ];
     if ( matches.length === 0 ) { return; }
 
-    js.push('/js/scripting/css-declarative.js');
+    js.push('/popups/adblock/js/scripting/css-declarative.js');
 
     const excludeMatches = [];
     if ( none.has('all-urls') === false ) {
@@ -359,7 +359,7 @@ function registerSpecific(context) {
     for ( const rulesetDetails of rulesetsDetails ) {
         const count = rulesetDetails.css?.specific || 0;
         if ( count === 0 ) { continue; }
-        js.push(`/rulesets/scripting/specific/${rulesetDetails.id}.js`);
+        js.push(`/popups/adblock/rulesets/scripting/specific/${rulesetDetails.id}.js`);
     }
     if ( js.length === 0 ) { return; }
 
@@ -370,7 +370,7 @@ function registerSpecific(context) {
     ];
     if ( matches.length === 0 ) { return; }
 
-    js.push('/js/scripting/css-specific.js');
+    js.push('/popups/adblock/js/scripting/css-specific.js');
 
     const excludeMatches = [];
     if ( none.has('all-urls') === false ) {
@@ -462,7 +462,7 @@ function registerScriptlet(context, scriptletDetails) {
 
             const directive = {
                 id,
-                js: [ `/rulesets/scripting/scriptlet/${id}.js` ],
+                js: [ `/popups/adblock/rulesets/scripting/scriptlet/${id}.js` ],
                 allFrames: true,
                 matches,
                 excludeMatches,
