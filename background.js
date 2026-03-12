@@ -1,6 +1,9 @@
 import * as tv from './backgrounds/tv.js';
 import * as adblock from './backgrounds/adblock.js';
 
+// Инициализируем adblock сразу при старте расширения
+adblock.start().catch(console.error);
+
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'openFullscreen') {
         tv.handleTV(message.url);
@@ -8,7 +11,6 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 });
 /*открытие вкладки расширения по клику на иконку*/
 chrome.action.onClicked.addListener((tab) => {
-    adblock.start(); // Инициализация adblock при открытии вкладки расширения
     const extensionPageUrl = chrome.runtime.getURL('index.html');
     chrome.tabs.query({ url: extensionPageUrl }, (tabs) => {
         if (tabs.length > 0) {

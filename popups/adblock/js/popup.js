@@ -30,6 +30,10 @@ import { dom, qs$ } from './dom.js';
 import { i18n,  i18n$ } from './i18n.js';
 import punycode from './punycode.js';
 
+// Получаем tabId из URL, если передан
+const urlParams = new URLSearchParams(window.location.search);
+const targetTabId = parseInt(urlParams.get('tabId'), 10);
+
 /******************************************************************************/
 
 const popupPanelData = {};
@@ -310,10 +314,17 @@ dom.on('[data-i18n-title="popupTipDashboard"]', 'click', ev => {
 /******************************************************************************/
 
 async function init() {
-    const [ tab ] = await browser.tabs.query({
-        active: true,
-        currentWindow: true,
-    });
+    let tab;
+    if (targetTabId && !isNaN(targetTabId)) {
+        try {
+            tab = await browser.tabs.get(targetTabId);
+        } catch (e) {
+            console.warn('Invalid tabId, fallback to active tab', e);
+        }
+    }
+    if (!tab) {
+        [tab] = await browser.tabs.query({ active: true, currentWindow: true });
+    }
     if ( tab instanceof Object === false ) { return true; }
     Object.assign(currentTab, tab);
 

@@ -102,6 +102,18 @@ async function onFilteringModeChange(ev) {
     const newLevel = parseInt(input.value, 10);
 
     switch ( newLevel ) {
+    case 0: // Полное отключение
+        // Отзываем разрешения на все сайты
+        await browser.permissions.remove({
+            origins: ['<all_urls>']
+        });
+        // Устанавливаем глобальный режим 0
+        const actualLevel0 = await sendMessage({
+            what: 'setDefaultFilteringMode',
+            level: 0,
+        });
+        cachedRulesetData.defaultFilteringMode = actualLevel0;
+        break;
     case 1: { // Revoke broad permissions
         await browser.permissions.remove({
             origins: [ '<all_urls>' ]
