@@ -1,0 +1,81 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../../index.css">
+    <link rel="stylesheet" href="./index.css">
+</head>
+<body style="padding: 1.5rem; background: transparent;">
+	<div class="column">
+		<h2 style="margin-top: 0;">🔓 Снятие ограничений с видео</h2>
+		<p style="color: #4a5a6e; margin-bottom: 1.5rem;">
+			Включите опции, чтобы убрать соответствующие ограничения на всех сайтах.
+			Изменения применяются автоматически к новым видео.
+		</p>
+
+		<div class="settings-card">
+			<div class="setting-item">
+				<input type="checkbox" id="removeDisablePictureInPicture">
+				<div>
+					<label for="removeDisablePictureInPicture">Разрешить PiP для всех видео</label>
+					<div class="setting-description">
+						Удаляет атрибут <code>disablePictureInPicture</code> у видео, 
+						позволяя использовать режим «картинка в картинке» даже если сайт запретил.
+					</div>
+				</div>
+			</div>
+
+			<div class="setting-item">
+				<input type="checkbox" id="removeControlsList">
+				<div>
+					<label for="removeControlsList">Разрешить скачивание видео</label>
+					<div class="setting-description">
+						Убирает <code>controlslist="nodownload"</code> и другие запреты на кнопку скачивания 
+						в стандартных контролах видео.
+					</div>
+				</div>
+			</div>
+
+			<div class="setting-item">
+				<input type="checkbox" id="removeDisableRemotePlayback">
+				<div>
+					<label for="removeDisableRemotePlayback">Разрешить удалённое воспроизведение (Cast/AirPlay)</label>
+					<div class="setting-description">
+						Удаляет атрибут <code>disableRemotePlayback</code>, позволяя использовать Chromecast, AirPlay и т.д.
+					</div>
+				</div>
+			</div>
+
+			<div class="setting-item">
+				<input type="checkbox" id="removeContextMenuBlock">
+				<div>
+					<label for="removeContextMenuBlock">Разблокировать контекстное меню на видео</label>
+					<div class="setting-description">
+						Убирает атрибуты <code>oncontextmenu</code> и обработчики, блокирующие правый клик на видео.
+						(Не конфликтует с модулем принудительного меню.)
+					</div>
+				</div>
+			</div>
+
+			<div class="setting-item">
+				<input type="checkbox" id="removeXWebkitAirplay">
+				<div>
+					<label for="removeXWebkitAirplay">Разрешить AirPlay (для Safari)</label>
+					<div class="setting-description">
+						Удаляет атрибут <code>x-webkit-airplay="deny"</code>, разрешая AirPlay на устройствах Apple.
+					</div>
+				</div>
+			</div>
+		</div>
+
+		<div class="note" style="margin-top: 2rem;">
+			<strong>ℹ️ Примечание:</strong> Некоторые сайты могут использовать сложные скрипты для блокировки, 
+			которые не удаляются простым изменением атрибутов. В таких случаях рекомендуется использовать 
+			модуль принудительного контекстного меню.
+		</div>
+	</div>
+
+    <script src="index.js"></script>
+</body>
+</html>
