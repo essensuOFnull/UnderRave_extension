@@ -320,7 +320,7 @@ if ( isBackgroundProcess !== true ) {
             }
             const img = document.createElement('img');
             const countryCode = unicodeFlagToImageSrc.get(match[0]);
-            img.src = `/img/flags-of-the-world/${countryCode}.png`;
+            img.src = `/popups/adblock/img/flags-of-the-world/${countryCode}.png`;
             img.title = countryCode;
             img.classList.add('countryFlag');
             fragment.append(img, '\u200A');
