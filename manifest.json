@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "刀口亼右户仨亼レ仨",
-	"version": "0.1.0",
+	"version": "1.0.0",
 	"description": "Набор улучшений для сайтов и браузера Google Chrome, разработанный для членов Подбредья.",
 	"permissions": [
 		"tabs",
@@ -12,7 +12,7 @@
 		"contextMenus"
 	],
 	"host_permissions": [
-  		"<all_urls>"
+		"<all_urls>"
 	],
 	"web_accessible_resources": [{
 		"resources": ["web_accessible_resources/**/*"],

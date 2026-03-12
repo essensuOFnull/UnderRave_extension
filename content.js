@@ -1,39 +1,34 @@
 (function() {
-	// === Модуль принудительного контекстного меню ===
-	let contextMenuHandler = null;
+  let lastContextMenuTarget = null;
+  let forceContextMenuEnabled = false; // будет прочитано из storage
 
-	function enableContextMenuAvailabler(enable) {
-	if (enable) {
-		if (!contextMenuHandler) {
-		contextMenuHandler = (e) => {
-			// Прерываем дальнейшую обработку события сайтом, но не отменяем стандартное меню
-			e.stopImmediatePropagation();
-			// Не вызываем preventDefault!
-		};
-		window.addEventListener('contextmenu', contextMenuHandler, true); // capture
-		console.log('Context menu avalabler enabled');
-		}
-	} else {
-		if (contextMenuHandler) {
-		window.removeEventListener('contextmenu', contextMenuHandler, true);
-		contextMenuHandler = null;
-		console.log('Context menu avalabler disabled');
-		}
-	}
-	}
+  // Единый обработчик контекстного меню на window в фазе захвата
+  function handleContextMenu(e) {
+    // Всегда запоминаем элемент, на котором кликнули
+    lastContextMenuTarget = e.target;
+    console.log('contextmenu target saved', e.target);
 
-	// Инициализация при загрузке страницы
-	chrome.storage.sync.get('contextMenuAvailablerEnabled', (data) => {
-	enableContextMenuAvailabler(data.contextMenuAvailablerEnabled !== false);
-	});
+    // Если включена опция принудительного меню – блокируем дальнейшие обработчики сайта
+    if (forceContextMenuEnabled) {
+      e.stopImmediatePropagation();
+      // Не вызываем preventDefault, чтобы стандартное меню появилось
+    }
+  }
 
-	// Слушаем изменения настройки
-	chrome.storage.onChanged.addListener((changes, area) => {
-	if (area === 'sync' && changes.contextMenuAvailablerEnabled) {
-		enableContextMenuAvailabler(changes.contextMenuAvailablerEnabled.newValue !== false);
-	}
-	});
-	// ==============================================
+  // Добавляем обработчик (сработает самым первым)
+  window.addEventListener('contextmenu', handleContextMenu, true);
+
+  // Читаем настройку из storage
+  chrome.storage.sync.get('contextMenuAvailablerEnabled', (data) => {
+    forceContextMenuEnabled = data.contextMenuAvailablerEnabled !== false;
+  });
+
+  // Следим за изменениями настройки
+  chrome.storage.onChanged.addListener((changes, area) => {
+    if (area === 'sync' && changes.contextMenuAvailablerEnabled) {
+      forceContextMenuEnabled = changes.contextMenuAvailablerEnabled.newValue !== false;
+    }
+  });
 
   // Глубокий поиск видео с учётом Shadow DOM
   function findNearestVideo(element) {
@@ -67,15 +62,7 @@
     return null;
   }
 
-  let lastContextMenuTarget = null;
-
-  // Запоминаем элемент при каждом правом клике (даже если не блокируем меню)
-  document.addEventListener('contextmenu', (e) => {
-    lastContextMenuTarget = e.target;
-    console.log('contextmenu target saved', e.target);
-  }, true);
-
-  // Обработка сообщения от фонового скрипта
+  // Обработка сообщения от фонового скрипта (клик по пункту PiP)
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message.action === 'enablePip') {
       if (!lastContextMenuTarget) {
@@ -93,5 +80,6 @@
       }
     }
   });
+
   console.log('🎯 Content script loaded');
 })();

@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+	<meta charset="UTF-8">
+	<meta name="viewport" content="width=device-width, initial-scale=1.0">
+	<link rel="stylesheet" href="../../index.css">
+	<link rel="stylesheet" href="./index.css">
+</head>
+<body style="padding: 1.5rem; background: transparent;">
+	<div class="column">
+		<h2 style="margin-top: 0;">⚙️ Настройки контекстного меню</h2>
+		
+		<div class="settings-card">
+			<div class="setting-item">
+				<input type="checkbox" id="forceContextMenuCheckbox">
+				<div>
+					<label for="forceContextMenuCheckbox">Принудительно показывать стандартное контекстное меню</label>
+					<div class="setting-description">
+						Блокирует попытки сайтов отключить контекстное меню (например, в видеоплеерах). 
+						Стандартное меню будет появляться всегда.
+					</div>
+				</div>
+			</div>
+
+			<div class="setting-item">
+				<input type="checkbox" id="pipMenuItemCheckbox">
+				<div>
+					<label for="pipMenuItemCheckbox">Показывать пункт «Включить режим картинка в картинке»</label>
+					<div class="setting-description">
+						Добавляет в контекстное меню пункт для запуска PiP для ближайшего видео. 
+						Работает на любых сайтах, даже если видео спрятано в теневом DOM.
+					</div>
+				</div>
+			</div>
+		</div>
+	
+		<div class="note" style="margin-top: 2rem;">
+			<strong>ℹ️ Примечание:</strong> Изменения вступают сразу после переключения чекбоксов. 
+			Для применения на уже открытых страницах может потребоваться их перезагрузка.
+		</div>
+	</div>
+
+	<script src="index.js"></script>
+</body>
+</html>
