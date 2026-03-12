@@ -73,6 +73,40 @@ import {
 import { broadcastMessage } from '../popups/adblock/js/utils.js';
 import { registerInjectables } from '../popups/adblock/js/scripting-manager.js';
 
+// Какие rulesets включать для каждого режима
+function getRulesetsForMode(mode) {
+    // Базовые списки (всегда должны быть включены, кроме режима 0)
+    const baseRulesets = ['default', 'badware', 'urlhaus-full', 'openphish-domains'];
+    
+    // Списки раздражителей (annoyances) – для режимов 2 и 3
+    const annoyancesRulesets = [
+        'annoyances-cookies',
+        'annoyances-overlays',
+        'annoyances-social',
+        'annoyances-widgets',
+        'annoyances-others'
+    ];
+    
+    // Региональные списки – для режима 3 (или для 2, если хотите)
+    // Здесь можно использовать функцию defaultRulesetsFromLanguage() для автоматического подбора
+    // или задать статический список. Для примера возьмём несколько.
+    const regionalRulesets = [
+        'rus-0', 'rus-1', 'deu-0', 'fra-0', /* и т.д. */
+    ];
+
+    switch (mode) {
+        case 0: // Нет фильтрации
+            return []; // отключаем всё
+        case 1: // Базовая
+            return baseRulesets;
+        case 2: // Оптимальная
+            return [...baseRulesets, ...annoyancesRulesets];
+        case 3: // Полная
+            return [...baseRulesets, ...annoyancesRulesets, ...regionalRulesets];
+        default:
+            return baseRulesets;
+    }
+}
 /******************************************************************************/
 
 const UBOL_ORIGIN = runtime.getURL('').replace(/\/$/, '');
@@ -321,17 +355,26 @@ export function onMessage(request, sender, callback) {
 
     case 'setDefaultFilteringMode': {
         getDefaultFilteringMode().then(beforeLevel =>
-            setDefaultFilteringMode(request.level).then(afterLevel =>
-                ({ beforeLevel, afterLevel })
-            )
+            setDefaultFilteringMode(request.level).then(async afterLevel => {
+                const rulesetsForMode = getRulesetsForMode(afterLevel); // определите эту функцию
+                await enableRulesets(rulesetsForMode);
+                await updateDynamicRules();
+                return { beforeLevel, afterLevel };
+            })
         ).then(({ beforeLevel, afterLevel }) => {
-            if ( beforeLevel === 1 || afterLevel === 1 ) {
-                updateDynamicRules();
-            }
-            if ( afterLevel !== beforeLevel ) {
+            if (afterLevel !== beforeLevel) {
                 registerInjectables();
             }
             callback(afterLevel);
+            if (rulesetConfig.autoReload) {
+                chrome.tabs.query({}, tabs => {
+                    for (const tab of tabs) {
+                        if (tab.url && !tab.url.startsWith(chrome.runtime.getURL(''))) {
+                            chrome.tabs.reload(tab.id);
+                        }
+                    }
+                });
+            }
         });
         return true;
     }
@@ -382,6 +425,9 @@ export function onMessage(request, sender, callback) {
 
 export async function start() {
     await loadRulesetConfig();
+    const currentMode = await getDefaultFilteringMode();
+    const rulesetsForMode = getRulesetsForMode(currentMode);
+    await enableRulesets(rulesetsForMode);
 
     const currentVersion = getCurrentVersion();
     const isNewVersion = currentVersion !== rulesetConfig.version;

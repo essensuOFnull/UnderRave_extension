@@ -104,9 +104,9 @@ async function onFilteringModeChange(ev) {
     switch ( newLevel ) {
     case 0: // Полное отключение
         // Отзываем разрешения на все сайты
-        await browser.permissions.remove({
+        /*await browser.permissions.remove({
             origins: ['<all_urls>']
-        });
+        });*/
         // Устанавливаем глобальный режим 0
         const actualLevel0 = await sendMessage({
             what: 'setDefaultFilteringMode',
@@ -115,24 +115,24 @@ async function onFilteringModeChange(ev) {
         cachedRulesetData.defaultFilteringMode = actualLevel0;
         break;
     case 1: { // Revoke broad permissions
-        await browser.permissions.remove({
+        /*await browser.permissions.remove({
             origins: [ '<all_urls>' ]
-        });
+        });*/
         cachedRulesetData.defaultFilteringMode = 1;
         break;
     }
     case 2:
     case 3: { // Request broad permissions
-        const granted = await browser.permissions.request({
+        /*const granted = await browser.permissions.request({
             origins: [ '<all_urls>' ]
         });
-        if ( granted ) {
+        if ( granted ) {*/
             const actualLevel = await sendMessage({
                 what: 'setDefaultFilteringMode',
                 level: newLevel,
             });
             cachedRulesetData.defaultFilteringMode = actualLevel;
-        }
+        /*}*/
         break;
     }
     default:
