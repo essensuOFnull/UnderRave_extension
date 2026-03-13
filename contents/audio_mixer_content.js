@@ -14,7 +14,8 @@
                 },
                 video: false
             });
-        } catch {
+        } catch (e) {
+            console.warn('getCaptureStream error:', e);
             return null;
         }
     }
@@ -39,19 +40,29 @@
         return devices;
     };
 
-    // Обработчик запроса списка медиаэлементов
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'getMediaSources') {
+            console.log('getMediaSources called in tab', sender.tab ? sender.tab.id : 'unknown');
             const sources = [];
-            document.querySelectorAll('video, audio').forEach((el, index) => {
-                sources.push({
-                    id: `${el.tagName}-${index}-${Date.now()}`,
-                    type: el.tagName,
-                    label: el.title || el.src || `${el.tagName} элемент ${index+1}`,
-                    enabled: false,
-                    volume: 100
+            function collectMedia(root) {
+                if (!root || !root.querySelectorAll) return;
+                root.querySelectorAll('video, audio').forEach((el, index) => {
+                    sources.push({
+                        id: `${el.tagName}-${index}-${Date.now()}`,
+                        type: el.tagName,
+                        label: el.title || el.src || el.currentSrc || `${el.tagName} элемент`,
+                    });
                 });
-            });
+                // Shadow DOM
+                const hosts = root.querySelectorAll('*');
+                hosts.forEach(host => {
+                    if (host.shadowRoot) {
+                        collectMedia(host.shadowRoot);
+                    }
+                });
+            }
+            collectMedia(document);
+            console.log('Found sources:', sources);
             sendResponse({ sources });
         }
     });

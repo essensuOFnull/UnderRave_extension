@@ -9,8 +9,16 @@ chrome.tabs.getCurrent(tab => {
 });
 
 async function getDevices() {
-    await navigator.mediaDevices.getUserMedia({ audio: true }).catch(() => {});
+    let tempStream;
+    try {
+        tempStream = await navigator.mediaDevices.getUserMedia({ audio: true });
+    } catch (e) {
+        // Пользователь отказал в доступе или нет микрофона
+    }
     const devices = await navigator.mediaDevices.enumerateDevices();
+    if (tempStream) {
+        tempStream.getTracks().forEach(t => t.stop());
+    }
     return devices.filter(d => d.kind === 'audioinput');
 }
 
@@ -45,15 +53,33 @@ function isSourceActive(id) {
 
 async function applyMixerState() {
     initAudio();
-    // Остановка неактивных источников
+    // Обновляем громкость уже активных источников
     for (let [id, src] of activeSources) {
-        if (!isSourceActive(id)) {
-            src.stream.getTracks().forEach(t => t.stop());
-            src.sourceNode.disconnect();
-            activeSources.delete(id);
+        if (id.startsWith('tab-')) {
+            const tabId = parseInt(id.slice(4));
+            const tabState = mixerState.tabs.find(t => t.tabId === tabId);
+            if (tabState && tabState.enabled) {
+                src.gainNode.gain.value = (tabState.volume || 100) / 100;
+            } else {
+                // источник стал неактивным – останавливаем
+                src.stream.getTracks().forEach(t => t.stop());
+                src.sourceNode.disconnect();
+                activeSources.delete(id);
+            }
+        } else {
+            // устройство
+            const devState = mixerState.devices.find(d => d.id === id);
+            if (devState && devState.enabled) {
+                src.gainNode.gain.value = devState.volume / 100;
+            } else {
+                src.stream.getTracks().forEach(t => t.stop());
+                src.sourceNode.disconnect();
+                activeSources.delete(id);
+            }
         }
     }
-    // Захват устройств
+
+    // Добавляем новые источники, которые ещё не активны
     for (let dev of mixerState.devices) {
         if (dev.enabled && !activeSources.has(dev.id)) {
             try {
@@ -68,17 +94,14 @@ async function applyMixerState() {
             }
         }
     }
-    // Захват вкладок (пока целиком)
+
     for (let tab of mixerState.tabs) {
         if (tab.enabled && !activeSources.has(`tab-${tab.tabId}`)) {
             try {
                 const stream = await new Promise((resolve, reject) => {
                     chrome.tabCapture.capture({ audio: true, video: false }, s => {
-                        if (chrome.runtime.lastError || !s) {
-                            reject(chrome.runtime.lastError);
-                        } else {
-                            resolve(s);
-                        }
+                        if (chrome.runtime.lastError || !s) reject(chrome.runtime.lastError);
+                        else resolve(s);
                     });
                 });
                 const sourceNode = audioContext.createMediaStreamSource(stream);
@@ -91,20 +114,45 @@ async function applyMixerState() {
             }
         }
     }
+
     document.getElementById('preview-video').srcObject = destination.stream;
 }
 
 // Запрос списка медиаэлементов из вкладки
 async function fetchTabSources(tabId) {
-    return new Promise(resolve => {
-        chrome.tabs.sendMessage(tabId, { action: 'getMediaSources' }, response => {
-            if (chrome.runtime.lastError || !response) {
-                resolve([]);
-            } else {
-                resolve(response.sources);
+    try {
+        const results = await chrome.scripting.executeScript({
+            target: { tabId: tabId, allFrames: true },
+            func: () => {
+                const sources = [];
+                function collectMedia(root) {
+                    if (!root || !root.querySelectorAll) return;
+                    root.querySelectorAll('video, audio').forEach((el, index) => {
+                        sources.push({
+                            id: `${el.tagName}-${index}-${Date.now()}`,
+                            type: el.tagName,
+                            label: el.title || el.src || el.currentSrc || `${el.tagName} элемент`,
+                        });
+                    });
+                    // Shadow DOM
+                    const hosts = root.querySelectorAll('*');
+                    hosts.forEach(host => {
+                        if (host.shadowRoot) {
+                            collectMedia(host.shadowRoot);
+                        }
+                    });
+                }
+                collectMedia(document);
+                return sources;
             }
         });
-    });
+        // results – массив объектов {frameId, result} для каждого фрейма
+        const allSources = results.flatMap(r => r.result || []);
+        return allSources;
+    } catch (e) {
+        console.warn('Ошибка получения источников через scripting.executeScript:', e);
+        return [];
+    }
 }
 
 // Рендер устройств
@@ -159,6 +207,62 @@ async function renderDevices() {
     });
 }
 
+async function loadTabSources(tabId, sourceListElement) {
+    try {
+        const sources = await fetchTabSources(tabId);
+        const tabState = mixerState.tabs.find(t => t.tabId === tabId);
+        if (tabState) {
+            tabState.sources = sources.map(s => ({
+                ...s,
+                enabled: false,
+                volume: 100
+            }));
+            saveState();
+            renderSources(tabState, sourceListElement);
+        }
+    } catch (e) {
+        console.warn('Ошибка получения источников из вкладки', e);
+        sourceListElement.innerHTML = '<p class="setting-description">Ошибка загрузки.</p>';
+    }
+}
+
+function renderSources(tabState, container) {
+    container.innerHTML = '';
+    if (!tabState.sources || tabState.sources.length === 0) {
+        container.innerHTML = '<p class="setting-description">Нет видео/аудио элементов на этой странице.</p>';
+        return;
+    }
+    tabState.sources.forEach(source => {
+        const div = document.createElement('div');
+        div.className = 'source-item';
+        div.dataset.sourceId = source.id;
+        div.innerHTML = `
+            <input type="checkbox" ${source.enabled ? 'checked' : ''} data-source-id="${source.id}">
+            <label>${source.label}</label>
+            <input type="range" min="0" max="100" value="${source.volume}" class="volume-slider" data-source-id="${source.id}">
+            <span class="volume-value">${source.volume}%</span>
+        `;
+        container.appendChild(div);
+
+        const checkbox = div.querySelector('input[type="checkbox"]');
+        checkbox.addEventListener('change', (e) => {
+            source.enabled = e.target.checked;
+            saveState();
+            // Здесь можно будет применить захват конкретного элемента
+        });
+
+        const slider = div.querySelector('.volume-slider');
+        const span = div.querySelector('.volume-value');
+        slider.addEventListener('input', (e) => {
+            const val = parseInt(e.target.value);
+            source.volume = val;
+            span.textContent = val + '%';
+            saveState();
+            // Здесь можно изменить громкость конкретного элемента
+        });
+    });
+}
+
 // Рендер вкладок
 async function renderTabs() {
     const tabs = await chrome.tabs.query({});
@@ -167,21 +271,27 @@ async function renderTabs() {
     container.innerHTML = '';
 
     // Синхронизируем состояние с существующими вкладками
+    // Удаляем состояния для закрытых вкладок
     mixerState.tabs = mixerState.tabs.filter(t => validTabs.some(tab => tab.id === t.tabId));
+
+    // Добавляем новые вкладки
     for (let tab of validTabs) {
-        let tabState = mixerState.tabs.find(t => t.tabId === tab.id);
-        if (!tabState) {
-            tabState = { tabId: tab.id, title: tab.title || 'Вкладка', enabled: false, expanded: false, sources: [], volume: 100 };
-            mixerState.tabs.push(tabState);
-        }
-        // Загружаем источники (если ещё не загружены)
-        if (tabState.sources.length === 0) {
-            tabState.sources = await fetchTabSources(tab.id);
+        if (!mixerState.tabs.some(t => t.tabId === tab.id)) {
+            mixerState.tabs.push({
+                tabId: tab.id,
+                title: tab.title || 'Вкладка',
+                enabled: false,
+                expanded: false,
+                sources: [],
+                volume: 100
+            });
         }
     }
 
+    // Сортируем по id
     mixerState.tabs.sort((a, b) => a.tabId - b.tabId);
 
+    // Рендерим каждую вкладку
     for (let tabState of mixerState.tabs) {
         const tabDiv = document.createElement('div');
         tabDiv.className = `tab-item ${tabState.expanded ? 'expanded' : ''}`;
@@ -198,28 +308,27 @@ async function renderTabs() {
                     <span class="volume-value">${tabState.volume || 100}%</span>
                 </div>
                 <div class="separator"></div>
-                ${tabState.sources.map(src => `
-                    <div class="source-item" data-source-id="${src.id}">
-                        <input type="checkbox" ${src.enabled ? 'checked' : ''} data-source-id="${src.id}">
-                        <label>${src.label}</label>
-                        <input type="range" min="0" max="100" value="${src.volume || 100}" class="volume-slider" data-source-id="${src.id}">
-                        <span class="volume-value">${src.volume || 100}%</span>
-                    </div>
-                `).join('')}
+                <div class="individual-sources"></div>
             </div>
         `;
         container.appendChild(tabDiv);
 
         const header = tabDiv.querySelector('.tab-header');
         const expandIcon = tabDiv.querySelector('.expand-icon');
-        const sourceList = tabDiv.querySelector('.source-list');
+        const sourceListDiv = tabDiv.querySelector('.source-list');
         const checkbox = tabDiv.querySelector('input[type="checkbox"]');
+        const individualSourcesDiv = tabDiv.querySelector('.individual-sources');
 
-        header.addEventListener('click', (e) => {
+        header.addEventListener('click', async (e) => {
             if (e.target.tagName === 'INPUT') return;
             tabState.expanded = !tabState.expanded;
             tabDiv.classList.toggle('expanded', tabState.expanded);
-            sourceList.style.display = tabState.expanded ? 'block' : 'none';
+            sourceListDiv.style.display = tabState.expanded ? 'block' : 'none';
+            if (tabState.expanded && (!tabState.sources || tabState.sources.length === 0)) {
+                await loadTabSources(tabState.tabId, individualSourcesDiv);
+            } else if (tabState.expanded && tabState.sources && tabState.sources.length > 0) {
+                renderSources(tabState, individualSourcesDiv);
+            }
         });
 
         checkbox.addEventListener('change', (e) => {
@@ -239,41 +348,8 @@ async function renderTabs() {
                 applyMixerState();
             });
         }
-
-        // Обработчики для отдельных источников
-        tabState.sources.forEach(src => {
-            const sourceDiv = tabDiv.querySelector(`[data-source-id="${src.id}"]`);
-            if (!sourceDiv) return;
-            const srcCheckbox = sourceDiv.querySelector('input[type="checkbox"]');
-            const srcSlider = sourceDiv.querySelector('.volume-slider');
-            const srcSpan = sourceDiv.querySelector('.volume-value');
-
-            srcCheckbox.addEventListener('change', (e) => {
-                src.enabled = e.target.checked;
-                saveState();
-                // TODO: при включении отдельного источника нужно захватывать его, а не всю вкладку
-                // Пока просто обновим общий захват, но в будущем можно расширить
-                applyMixerState();
-            });
-
-            srcSlider.addEventListener('input', (e) => {
-                const val = parseInt(e.target.value);
-                src.volume = val;
-                srcSpan.textContent = val + '%';
-                saveState();
-                applyMixerState();
-            });
-        });
     }
 }
-
-// Обработчик на весь экран
-document.getElementById('fullscreen-btn').addEventListener('click', () => {
-    const video = document.getElementById('preview-video');
-    if (video.requestFullscreen) {
-        video.requestFullscreen();
-    }
-});
 
 // Инициализация
 loadState().then(() => {
