@@ -1,0 +1,105 @@
+.mixer-section {
+    margin-bottom: 2rem;
+}
+
+.device-item, .tab-item {
+    background: #f8fafd;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.device-header, .tab-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.tab-header {
+    font-weight: 600;
+}
+
+.expand-icon {
+    font-size: 0.8rem;
+    color: #64748b;
+    transition: transform 0.2s;
+}
+
+.expanded .expand-icon {
+    transform: rotate(90deg);
+}
+
+.source-list {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
+    display: none;
+}
+
+.expanded .source-list {
+    display: block;
+}
+
+.source-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+}
+
+.source-item label {
+    font-size: 0.9rem;
+    color: #1e293b;
+    flex: 1;
+}
+
+.volume-slider {
+    width: 120px;
+    height: 4px;
+    accent-color: #1e293b;
+}
+
+.volume-value {
+    min-width: 40px;
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+
+.separator {
+    height: 1px;
+    background: #e2e8f0;
+    margin: 0.5rem 0;
+}
+
+/* Стили для видео-превью */
+#preview-container {
+	margin: 20px 0;
+	background: #000;
+	border-radius: 12px;
+	overflow: hidden;
+	position: relative;
+}
+#preview-video {
+	width: 100%;
+	max-height: 300px;
+	object-fit: contain;
+	background: #000;
+	display: block;
+}
+#fullscreen-btn {
+	position: absolute;
+	bottom: 10px;
+	right: 10px;
+	background: rgba(0,0,0,0.7);
+	color: white;
+	border: none;
+	padding: 8px 16px;
+	border-radius: 20px;
+	cursor: pointer;
+	font-size: 14px;
+}
+#fullscreen-btn:hover {
+	background: rgba(0,0,0,0.9);
+}
+.hidden { display: none; }

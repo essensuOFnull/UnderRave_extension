@@ -9,7 +9,9 @@
 		"activeTab",
 		"declarativeNetRequest",
 		"storage",
-		"contextMenus"
+		"contextMenus",
+		"tabCapture",
+        "desktopCapture"
 	],
 	"host_permissions": [
 		"<all_urls>"
@@ -41,7 +43,8 @@
 				"contents/context_menu.js",
 				"contents/video_search.js",
 				"contents/lifting_restrictions.js",
-				"contents/pip_handler.js"
+				"contents/pip_handler.js",
+				"contents/audio_mixer_content.js"
 			],
 			"run_at": "document_start",
 			"all_frames": true
