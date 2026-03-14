@@ -346,18 +346,6 @@ document.getElementById('listen-volume').addEventListener('input', (e) => {
     if (listenGainNode) listenGainNode.gain.value = val / 100;
 });
 
-isListening = true;
-document.getElementById('toggle-listen').addEventListener('click', (e) => {
-    if (isListening) {
-        listenGainNode.disconnect();
-        e.target.textContent = '▶️ Возобновить';
-    } else {
-        listenGainNode.connect(audioContext.destination);
-        e.target.textContent = '⏸️ Приостановить';
-    }
-    isListening = !isListening;
-});
-
 document.getElementById('fullscreen-btn').addEventListener('click', () => {
     document.getElementById('preview-video').requestFullscreen();
 });
@@ -366,17 +354,6 @@ document.getElementById('listen-volume').addEventListener('input', (e) => {
     const val = parseInt(e.target.value);
     document.getElementById('listen-volume-value').textContent = val + '%';
     if (listenGainNode) listenGainNode.gain.value = val / 100;
-});
-
-document.getElementById('toggle-listen').addEventListener('click', (e) => {
-    if (isListening) {
-        listenGainNode.disconnect();
-        e.target.textContent = '▶️ Возобновить';
-    } else {
-        listenGainNode.connect(audioContext.destination);
-        e.target.textContent = '⏸️ Приостановить';
-    }
-    isListening = !isListening;
 });
 
 document.getElementById('add-source-btn').addEventListener('click', async () => {
