@@ -48,6 +48,13 @@
 			],
 			"run_at": "document_start",
 			"all_frames": true
+		},
+		{
+			"matches": ["*://nyx-app.ru/*"],
+			"js": ["contents/nyx.js"],
+			"css": ["styles/nyx.css"],
+			"run_at": "document_start",
+			"all_frames": true
 		}
 	]
 }
