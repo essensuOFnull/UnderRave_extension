@@ -9,70 +9,6 @@ let isCapturePending = false; // защита от одновременных д
 // Регистрируем эту вкладку как микшер (используем sender.tab.id в фоне)
 chrome.runtime.sendMessage({ action: 'registerMixerTab' });
 
-async function captureTabAudio(tabState) {
-    if (isCapturePending) {
-        alert('Подождите завершения текущего выбора источника');
-        tabState.enabled = false;
-        updateCheckbox(tabState.tabId, false);
-        return;
-    }
-
-    const key = `tab-${tabState.tabId}`;
-    if (activeSources.has(key)) return;
-
-    isCapturePending = true;
-    try {
-        console.log('Запрос выбора источника для вкладки через getDisplayMedia');
-        
-        // Запрашиваем поток с видео и аудио (видео потом отключим)
-        const stream = await navigator.mediaDevices.getDisplayMedia({
-            audio: true,
-            video: {
-                displaySurface: 'browser' // подсказка, что хотим вкладку
-            }
-        });
-
-        console.log('Получен stream из getDisplayMedia', stream);
-
-        // Останавливаем видео-треки, оставляем только аудио
-        const videoTracks = stream.getVideoTracks();
-        videoTracks.forEach(track => {
-            track.stop();
-            console.log('Видео-трек остановлен:', track.label);
-        });
-
-        const audioTracks = stream.getAudioTracks();
-        if (audioTracks.length === 0) {
-            throw new Error('Выбранный источник не содержит аудиодорожек');
-        }
-
-        console.log('Аудио-треки:', audioTracks.map(t => t.label));
-
-        // Проверяем состояние AudioContext
-        if (audioContext.state === 'suspended') {
-            await audioContext.resume();
-        }
-
-        const sourceNode = audioContext.createMediaStreamSource(stream);
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = (tabState.volume || 100) / 100;
-        sourceNode.connect(gainNode);
-        gainNode.connect(destination);
-        activeSources.set(key, { sourceNode, gainNode, stream });
-
-        document.getElementById('preview-video').srcObject = destination.stream;
-        console.log('Источник успешно добавлен в микшер');
-    } catch (err) {
-        console.error('Ошибка в captureTabAudio:', err);
-        tabState.enabled = false;
-        saveState();
-        updateCheckbox(tabState.tabId, false);
-        alert('Не удалось захватить аудио: ' + err.message);
-    } finally {
-        isCapturePending = false;
-    }
-}
-
 // Вспомогательная функция для обновления чекбокса
 function updateCheckbox(tabId, checked) {
     const checkbox = document.querySelector(`input[data-tab-id="${tabId}"]`);
@@ -228,13 +164,6 @@ async function renderDevices() {
     });
 }
 
-async function restoreEnabledTabs() {
-    for (let tabState of mixerState.tabs) {
-        if (tabState.enabled) {
-            await captureTabAudio(tabState);
-        }
-    }
-}
 /*функции источников*/
 async function addSourceToMixer(sourceId, stream, volume = 100) {
     initAudio();
@@ -336,7 +265,6 @@ function renderSources() {
 // ---------- Инициализация ----------
 loadState().then(async () => {
     await renderDevices();
-    await restoreEnabledTabs();
     updateMixer();
 });
 
