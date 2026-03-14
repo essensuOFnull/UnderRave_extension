@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "刀口亼右户仨亼レ仨",
-	"version": "2.0.0",
+	"version": "3.0.0",
 	"description": "Набор улучшений для сайтов и браузера Google Chrome, разработанный для членов Подбредья.",
 	"permissions": [
 		"tabs",
@@ -44,7 +44,7 @@
 				"contents/video_search.js",
 				"contents/lifting_restrictions.js",
 				"contents/pip_handler.js",
-				"contents/audio_mixer.js"
+				"contents/media_mixer.js"
 			],
 			"run_at": "document_start",
 			"all_frames": true

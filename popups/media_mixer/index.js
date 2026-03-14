@@ -1,4 +1,4 @@
-// popups/audio_mixer/index.js
+// popups/media_mixer/index.js
 // Версия с ручками ресайза (8 областей)
 let compressor;
 
@@ -29,9 +29,112 @@ let stageWidth = 1920;   // логическая ширина
 let stageHeight = 1080;  // логическая высота
 let scale = 1;
 
+// Видео-композитинг
+let compositeCanvas;
+let compositeCtx;
+let compositeAnimationFrame = null;
+let compositeStream = null;
+let videoTrackFromCanvas = null;
 // Регистрируем эту вкладку как микшер
 chrome.runtime.sendMessage({ action: 'registerMixerTab' });
 
+function initCompositeCanvas() {
+    if (!compositeCanvas) {
+        compositeCanvas = document.createElement('canvas');
+        compositeCanvas.width = stageWidth;
+        compositeCanvas.height = stageHeight;
+        compositeCtx = compositeCanvas.getContext('2d');
+    }
+    if (!compositeAnimationFrame) {
+        renderCompositeLoop();
+    }
+}
+function renderCompositeLoop() {
+    compositeCtx.clearRect(0, 0, stageWidth, stageHeight);
+
+    videoLayers.forEach(layer => {
+        if (!layer.visible) return;
+        const videoEl = layer.videoElement;
+        if (!videoEl || videoEl.readyState < 2) return;
+        const x = layer.x;
+        const y = layer.y;
+        const w = layer.width;
+        const h = layer.height;
+        compositeCtx.save();
+        if (layer.flipX || layer.flipY) {
+            compositeCtx.translate(x + w/2, y + h/2);
+            compositeCtx.scale(layer.flipX ? -1 : 1, layer.flipY ? -1 : 1);
+            compositeCtx.drawImage(videoEl, -w/2, -h/2, w, h);
+        } else {
+            compositeCtx.drawImage(videoEl, x, y, w, h);
+        }
+        compositeCtx.restore();
+    });
+
+    compositeAnimationFrame = requestAnimationFrame(renderCompositeLoop);
+}
+function updateCompositeStream() {
+    if (!compositeCanvas) return;
+
+    // Получаем текущую видеодорожку из canvas (создаём новый поток при каждом вызове)
+    // Но чтобы избежать постоянного создания новых потоков, можно сохранять видеодорожку и обновлять её,
+    // однако captureStream при каждом кадре создаёт новый поток, что неэффективно.
+    // Лучше один раз создать MediaStream из canvas и затем только заменять трек, но canvas.captureStream()
+    // возвращает новый поток каждый раз. Вместо этого мы будем один раз получить поток из canvas и затем
+    // в preview-video обновлять srcObject при необходимости (например, при изменении состава дорожек).
+    // Но т.к. видеодорожка из canvas не меняется (только её содержание), можно один раз создать поток и
+    // использовать его постоянно. Canvas.captureStream() создаёт поток, который будет обновляться автоматически.
+    // Поэтому сделаем так: при первом вызове создаём compositeStream из canvas и назначаем в preview.
+    // Далее просто используем этот же поток, он будет обновляться кадрами canvas.
+
+    if (!compositeStream) {
+        // Получаем поток из canvas (с частотой кадров по умолчанию)
+        compositeStream = compositeCanvas.captureStream(30); // 30 fps
+        // Добавляем аудиодорожки из destination.stream
+        const audioTracks = destination.stream.getAudioTracks();
+        audioTracks.forEach(track => compositeStream.addTrack(track));
+
+        // Назначаем поток в preview-video
+        const previewVideo = document.getElementById('preview-video');
+        if (previewVideo) {
+            previewVideo.srcObject = compositeStream;
+        }
+    } else {
+        // Если аудиодорожки изменились (например, добавился/удалился источник), нужно обновить состав дорожек.
+        // Для простоты будем пересоздавать compositeStream при изменении списка аудиоисточников.
+        // Но пока оставим как есть, позже добавим обновление.
+    }
+}
+function refreshCompositeStreamAudio() {
+    if (!compositeStream) {
+        compositeStream = compositeCanvas.captureStream(30);
+    }
+
+    // Останавливаем старые видеодорожки и удаляем их
+    compositeStream.getVideoTracks().forEach(t => {
+        t.stop();
+        compositeStream.removeTrack(t);
+    });
+
+    // Создаём новый видеопоток из canvas (чтобы получить свежий видеотрек)
+    const newCanvasStream = compositeCanvas.captureStream(30);
+    const videoTrack = newCanvasStream.getVideoTracks()[0];
+    compositeStream.addTrack(videoTrack);
+
+    // Удаляем все старые аудиодорожки
+    compositeStream.getAudioTracks().forEach(t => compositeStream.removeTrack(t));
+
+    // Добавляем текущие аудиодорожки из destination.stream, если он есть
+    if (destination && destination.stream) {
+        destination.stream.getAudioTracks().forEach(track => compositeStream.addTrack(track));
+    }
+
+    // Обновляем preview
+    const previewVideo = document.getElementById('preview-video');
+    if (previewVideo && previewVideo.srcObject !== compositeStream) {
+        previewVideo.srcObject = compositeStream;
+    }
+}
 // ---------- Преобразование координат ----------
 function screenToLogical(screenX, screenY) {
 	return {
@@ -132,6 +235,7 @@ async function updateMixer() {
     }
 
     document.getElementById('preview-video').srcObject = destination.stream;
+	refreshCompositeStreamAudio();
 }
 
 async function renderDevices() {
@@ -897,6 +1001,7 @@ async function addSourceToMixer(sourceId, stream, metadata) {
 	saveState();
 	renderSources();
 	document.getElementById('preview-video').srcObject = destination.stream;
+	refreshCompositeStreamAudio();
 }
 
 function removeSource(sourceId) {
@@ -915,6 +1020,7 @@ function removeSource(sourceId) {
 		saveState();
 		renderSources();
 	}
+	refreshCompositeStreamAudio();
 }
 
 // ---------- Захват экрана/окна/вкладки ----------
@@ -1006,6 +1112,7 @@ function setStageSize() {
 // ---------- Инициализация ----------
 document.addEventListener('DOMContentLoaded', () => {
 	setStageSize();
+	initCompositeCanvas();
 	loadState().then(async () => {
 		await renderDevices();
 		updateMixer();
@@ -1036,3 +1143,10 @@ document.addEventListener('keydown', (e) => {
 });
 
 document.getElementById('add-screen-source-btn')?.addEventListener('click', captureScreen);
+
+window.addEventListener('beforeunload', () => {
+    if (compositeAnimationFrame) {
+        cancelAnimationFrame(compositeAnimationFrame);
+        compositeAnimationFrame = null;
+    }
+});

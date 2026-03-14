@@ -12,12 +12,13 @@
 			<button class="tab-button" data-tab="context_menu">Настройки контекстного меню</button>
 			<button class="tab-button" data-tab="lifting_restrictions">Снятие ограничений</button>
 			<button class="tab-button" data-tab="tv">Русское ТВ</button>
-			<button class="tab-button" data-tab="audio_mixer">Аудио микшер</button>
+			<button class="tab-button" data-tab="media_mixer">🎬 Видео/аудио микшер</button>
 		</div>
 
 		<div id="features" class="tab-content active">
 			<h2>✨ Что умеет расширение</h2>
 			<div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+				<!-- Существующие карточки -->
 				<div class="card" style="padding: 1.5rem;">
 					<h3>📺 Русское ТВ в полном экране</h3>
 					<p>Открывает телеканалы в полноэкранном режиме без лишних элементов. Доступны федеральные, развлекательные и другие каналы.</p>
@@ -42,6 +43,32 @@
 					<h3>🧩 Работа с Shadow DOM</h3>
 					<p>Все функции работают даже если видео спрятано внутри теневого дерева (Shadow DOM) — поиск и применение изменений происходит рекурсивно.</p>
 				</div>
+
+				<!-- НОВЫЕ КАРТОЧКИ (видео/аудио микшер) -->
+				<div class="card" style="padding: 1.5rem;">
+					<h3>🎚️ "Профессиональное" микширование звука</h3>
+					<p>Использует Web Audio API с компрессором для "чистого" и "сбалансированного" звука "без искажений". Управляйте громкостью микрофонов и системных аудиопотоков независимо.</p>
+				</div>
+				<div class="card" style="padding: 1.5rem;">
+					<h3>🎬 Видео-микшер реального времени</h3>
+					<p>Накладывайте несколько видео (экраны, окна, вкладки) друг на друга, создавайте композиции. Все трансформации применяются в реальном времени с "минимальной" задержкой.</p>
+				</div>
+				<div class="card" style="padding: 1.5rem;">
+					<h3>🖱️ Интерактивное управление слоями</h3>
+					<p>Перетаскивайте и изменяйте размер видео прямо в окне предпросмотра мышью. "Удобная" привязка к границам сцены и другим слоям помогает быстро выровнять элементы.</p>
+				</div>
+				<div class="card" style="padding: 1.5rem;">
+					<h3>🔄 Трансформация и отражение</h3>
+					<p>Отражайте видео по горизонтали/вертикали, точно позиционируйте через числовые поля в карточках источников. Поддержка произвольного соотношения сторон.</p>
+				</div>
+				<div class="card" style="padding: 1.5rem;">
+					<h3>🎛️ Гибкое управление источниками</h3>
+					<p>Регулируйте громкость каждого аудиопотока (микрофоны, системные звуки) независимо, отключайте ненужные источники. Визуальный список слоёв с элементами управления.</p>
+				</div>
+				<div class="card" style="padding: 1.5rem;">
+					<h3>🖥️ Полноэкранный режим превью</h3>
+					<p>Просматривайте итоговый микс в полноэкранном режиме одной кнопкой — удобно для презентаций или стриминга.</p>
+				</div>
 			</div>
 			<div class="note" style="margin-top: 2rem;">
 				<strong>📌 Важно:</strong> Некоторые сайты могут кэшировать поведение. Если изменения не применяются, перезагрузите страницу.
@@ -57,8 +84,8 @@
 		<div id="tv" class="tab-content">
 			<iframe src="popups/tv/index.html"></iframe>
 		</div>
-		<div id="audio_mixer" class="tab-content">
-			<iframe src="popups/audio_mixer/index.html"></iframe>
+		<div id="media_mixer" class="tab-content">
+			<iframe src="popups/media_mixer/index.html"></iframe>
 		</div>
 	</div>
 	<script src="index.js"></script>
