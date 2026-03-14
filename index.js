@@ -11,3 +11,11 @@ document.querySelectorAll('.tab-button').forEach(button => {
 		document.getElementById(tabId).classList.add('active');
 	});
 });
+// Обработка сообщений от iframe
+window.addEventListener('message', (event) => {
+    if (event.data.action === 'enterFullWindow') {
+        document.body.classList.add('fullscreen-mode');
+    }else if (event.data.action === 'exitFullWindow') {
+        document.body.classList.remove('fullscreen-mode');
+    }
+});

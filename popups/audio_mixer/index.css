@@ -87,7 +87,7 @@
 	background: #000;
 	display: block;
 }
-#fullscreen-btn {
+#fullscreen-window-btn {
 	position: absolute;
 	bottom: 10px;
 	right: 10px;
@@ -99,7 +99,39 @@
 	cursor: pointer;
 	font-size: 14px;
 }
-#fullscreen-btn:hover {
+#fullscreen-window-btn:hover {
 	background: rgba(0,0,0,0.9);
 }
 .hidden { display: none; }
+
+/* Режим разворачивания видео на всю вкладку */
+body.fullscreen-mode {
+    overflow: hidden;
+}
+body.fullscreen-mode #main_grid,
+body.fullscreen-mode .tabs,
+body.fullscreen-mode h1,
+body.fullscreen-mode p,
+body.fullscreen-mode .settings-card,
+body.fullscreen-mode #add-screen-source-btn,
+body.fullscreen-mode #fullscreen-window-btn {
+    display: none !important;
+}
+body.fullscreen-mode #preview-container {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: black !important;
+    z-index: 10000 !important;
+    border-radius: 0 !important;
+}
+body.fullscreen-mode #preview-video {
+    width: 100% !important;
+    height: 100% !important;
+    max-height: none !important;
+    object-fit: contain !important;
+}

@@ -12,7 +12,7 @@
 
 		<div id="preview-container">
 			<video id="preview-video" autoplay playsinline muted></video>
-			<button id="fullscreen-btn">⛶ На весь экран</button>
+			<button id="fullscreen-window-btn">⛶ На всё окно</button>
 		</div>
 		<div class="settings-card">
 			<h3>🔊 Прослушивание микшера</h3>
@@ -31,8 +31,10 @@
 		</div>
 
 		<div class="settings-card">
-			<h3>🌐 Внешние источники (вкладки, окна, экран)</h3>
-			<button id="add-source-btn" class="primary-button">➕ Добавить источник</button>
+			<h3>🌐 Внешние источники</h3>
+			<div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
+				<button id="add-screen-source-btn" class="primary-button">🖥️ Добавить вкладку/окно/экран</button>
+			</div>
 			<div id="sources-list"></div>
 		</div>
 	</div>
