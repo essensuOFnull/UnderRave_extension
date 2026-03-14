@@ -263,28 +263,24 @@ function updateResizeHandles(layerDiv, width, height) {
     });
 }
 
-// ---------- Функции работы со слоями ----------
+// ---------- Функции работы со слоями (изменена applyLayerTransform) ----------
 function applyLayerTransform(layer) {
     const div = document.getElementById(layer.id);
     if (!div) return;
 
-    // Вычисляем экранные координаты из логических
-    const screenPos = logicalToScreen(layer.x, layer.y);
-    const screenWidth = layer.width * scale;
-    const screenHeight = layer.height * scale;
-
-    div.style.left = screenPos.x + 'px';
-    div.style.top = screenPos.y + 'px';
-    div.style.width = screenWidth + 'px';
-    div.style.height = screenHeight + 'px';
+    // Устанавливаем логические координаты и размеры
+    div.style.left = layer.x + 'px';
+    div.style.top = layer.y + 'px';
+    div.style.width = layer.width + 'px';
+    div.style.height = layer.height + 'px';
 
     // Отражение (если нужно)
     let scaleX = layer.flipX ? -1 : 1;
     let scaleY = layer.flipY ? -1 : 1;
     div.style.transform = `scale(${scaleX}, ${scaleY})`;
 
-    // Обновляем ручки ресайза
-    updateResizeHandles(div, screenWidth, screenHeight);
+    // Обновляем ручки ресайза (они остаются внутри слоя и не требуют трансформации)
+    updateResizeHandles(div, layer.width * scale, layer.height * scale); // передаём логические размеры, умноженные на scale? Но ручки должны быть в экранных пикселях. Лучше переделать updateResizeHandles так, чтобы она принимала логические размеры и сама вычисляла экранные через scale. Пока оставим как есть, но учтём, что теперь размеры слоя в CSS логические, а ручки должны быть размером 10px в экранных пикселях. Это значит, что в updateResizeHandles нужно использовать scale. Но в текущей реализации updateResizeHandles использует width и height, которые приходят из applyLayerTransform как screenWidth и screenHeight. Мы передаём layer.width * scale и layer.height * scale. Это правильно.
 }
 
 function updateLayerDataFromDiv(div) {
@@ -942,25 +938,28 @@ async function saveState() {
 
 // ---------- Управление масштабом сцены ----------
 function setStageSize() {
-    const stage = document.getElementById('video-stage');
+    const videoStage = document.getElementById('video-stage');
     const container = document.getElementById('video-layers-container');
-    if (!stage || !container) return;
+    if (!videoStage || !container) return;
 
-    stageRect = stage.getBoundingClientRect();
+    const stageRect = videoStage.getBoundingClientRect();
     const availableWidth = stageRect.width;
     const availableHeight = stageRect.height;
 
     scale = Math.min(availableWidth / stageWidth, availableHeight / stageHeight);
 
-    containerOffset.x = (availableWidth - stageWidth * scale) / 2;
-    containerOffset.y = (availableHeight - stageHeight * scale) / 2;
+    const offsetX = (availableWidth - stageWidth * scale) / 2;
+    const offsetY = (availableHeight - stageHeight * scale) / 2;
+
+    // containerOffset - это экранные координаты левого верхнего угла логического экрана
+    containerOffset.x = stageRect.left + offsetX;
+    containerOffset.y = stageRect.top + offsetY;
 
     container.style.setProperty('--stage-width', stageWidth + 'px');
     container.style.setProperty('--stage-height', stageHeight + 'px');
     container.style.setProperty('--scale', scale);
-    container.style.transform = `translate(${containerOffset.x}px, ${containerOffset.y}px) scale(${scale})`;
+    container.style.transform = `translate(${offsetX}px, ${offsetY}px) scale(${scale})`;
 
-    // Перерисовываем все слои с новым масштабом
     videoLayers.forEach(layer => applyLayerTransform(layer));
 }
 
