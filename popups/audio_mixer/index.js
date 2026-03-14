@@ -12,10 +12,8 @@ chrome.runtime.sendMessage({ action: 'registerMixerTab' });
 async function captureTabAudio(tabState) {
     if (isCapturePending) {
         alert('Подождите завершения текущего выбора источника');
-        // Сбрасываем чекбокс
         tabState.enabled = false;
-        const checkbox = document.querySelector(`input[data-tab-id="${tabState.tabId}"]`);
-        if (checkbox) checkbox.checked = false;
+        updateCheckbox(tabState.tabId, false);
         return;
     }
 
@@ -24,31 +22,35 @@ async function captureTabAudio(tabState) {
 
     isCapturePending = true;
     try {
-        const streamId = await new Promise((resolve, reject) => {
-            chrome.desktopCapture.chooseDesktopMedia(
-                ['tab', 'audio'], // можно добавить 'window', 'screen'
-                (streamId) => {
-                    if (chrome.runtime.lastError || !streamId) {
-                        reject(chrome.runtime.lastError || new Error('No streamId'));
-                    } else {
-                        resolve(streamId);
-                    }
-                }
-            );
+        console.log('Запрос выбора источника для вкладки через getDisplayMedia');
+        
+        // Запрашиваем поток с видео и аудио (видео потом отключим)
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            audio: true,
+            video: {
+                displaySurface: 'browser' // подсказка, что хотим вкладку
+            }
         });
 
-        const stream = await navigator.mediaDevices.getUserMedia({
-            audio: {
-                mandatory: {
-                    chromeMediaSource: 'desktop',
-                    chromeMediaSourceId: streamId
-                }
-            },
-            video: false
+        console.log('Получен stream из getDisplayMedia', stream);
+
+        // Останавливаем видео-треки, оставляем только аудио
+        const videoTracks = stream.getVideoTracks();
+        videoTracks.forEach(track => {
+            track.stop();
+            console.log('Видео-трек остановлен:', track.label);
         });
 
-        if (stream.getAudioTracks().length === 0) {
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
             throw new Error('Выбранный источник не содержит аудиодорожек');
+        }
+
+        console.log('Аудио-треки:', audioTracks.map(t => t.label));
+
+        // Проверяем состояние AudioContext
+        if (audioContext.state === 'suspended') {
+            await audioContext.resume();
         }
 
         const sourceNode = audioContext.createMediaStreamSource(stream);
@@ -58,18 +60,23 @@ async function captureTabAudio(tabState) {
         gainNode.connect(destination);
         activeSources.set(key, { sourceNode, gainNode, stream });
 
-        // Обновляем видео-превью (на всякий случай)
         document.getElementById('preview-video').srcObject = destination.stream;
+        console.log('Источник успешно добавлен в микшер');
     } catch (err) {
-        console.error('Ошибка захвата вкладки:', err);
+        console.error('Ошибка в captureTabAudio:', err);
         tabState.enabled = false;
         saveState();
-        const checkbox = document.querySelector(`input[data-tab-id="${tabState.tabId}"]`);
-        if (checkbox) checkbox.checked = false;
-        alert('Не удалось захватить аудио из выбранного источника. Возможно, источник не содержит звука.');
+        updateCheckbox(tabState.tabId, false);
+        alert('Не удалось захватить аудио: ' + err.message);
     } finally {
         isCapturePending = false;
     }
+}
+
+// Вспомогательная функция для обновления чекбокса
+function updateCheckbox(tabId, checked) {
+    const checkbox = document.querySelector(`input[data-tab-id="${tabId}"]`);
+    if (checkbox) checkbox.checked = checked;
 }
 
 // ---------- Загрузка/сохранение состояния ----------
@@ -310,8 +317,8 @@ async function renderTabs() {
 loadState().then(async () => {
     await renderDevices();
     await renderTabs();
-    await restoreEnabledTabs(); // <-- добавить
-    updateMixer(); // обновит микрофоны и громкость
+    await restoreEnabledTabs();
+    updateMixer();
 });
 
 document.getElementById('listen-volume').addEventListener('input', (e) => {
