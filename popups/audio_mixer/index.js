@@ -1,17 +1,52 @@
+// popups/audio_mixer/index.js
+// Версия с ручками ресайза (8 областей)
+
 let audioContext, destination;
 let activeSources = new Map(); // ключ: sourceId (для аудио)
 let mixerState = { devices: [], sources: [] };
 let listenGainNode;
 
 // Хранилище видеослоёв
-let videoLayers = []; // массив объектов { id, stream, videoElement, x, y, width, height, flipX, flipY, visible }
+let videoLayers = []; // массив объектов { id, sourceId, videoElement, stream, label, icon, x, y, width, height, flipX, flipY, visible, naturalAspect }
 let nextLayerId = 1;
-let isDraggingOrResizing = false; // для предотвращения лишних обновлений
+
+// Переменные для ручного drag & resize
+let dragState = {
+    active: false,
+    layerId: null,
+    startMouseX: 0,
+    startMouseY: 0,
+    startLayer: null, // копия начальных параметров слоя (x, y, width, height)
+    edge: null,       // какой край/угол тянем
+    ctrlPressed: false
+};
+
+// Параметры сцены
+let stageRect = { x: 0, y: 0, width: 0, height: 0 };
+let containerOffset = { x: 0, y: 0 };
+let stageWidth = 1920;   // логическая ширина
+let stageHeight = 1080;  // логическая высота
+let scale = 1;
 
 // Регистрируем эту вкладку как микшер
 chrome.runtime.sendMessage({ action: 'registerMixerTab' });
 
-// ---------- Инициализация аудио ----------
+// ---------- Преобразование координат ----------
+function screenToLogical(screenX, screenY) {
+    return {
+        x: (screenX - containerOffset.x) / scale,
+        y: (screenY - containerOffset.y) / scale
+    };
+}
+
+function logicalToScreen(logicalX, logicalY) {
+    return {
+        x: containerOffset.x + logicalX * scale,
+        y: containerOffset.y + logicalY * scale
+    };
+}
+
+// ---------- Инициализация аудио (без изменений) ----------
 function initAudio() {
     if (!audioContext) {
         audioContext = new AudioContext();
@@ -138,7 +173,140 @@ async function renderDevices() {
     });
 }
 
-// ---------- Работа с видеослоями ----------
+// ---------- Функции создания и обновления ручек ресайза ----------
+function createResizeHandles(layerDiv) {
+    const positions = [
+        'top-left', 'top', 'top-right',
+        'left', 'right',
+        'bottom-left', 'bottom', 'bottom-right'
+    ];
+    positions.forEach(pos => {
+        const handle = document.createElement('div');
+        handle.className = `resize-handle ${pos}`;
+        handle.dataset.edge = pos;
+        layerDiv.appendChild(handle);
+    });
+}
+
+function updateResizeHandles(layerDiv, width, height) {
+    const handles = layerDiv.querySelectorAll('.resize-handle');
+    const handleSize = 10; // размер угловых ручек в пикселях
+    const sideWidth = 10; // толщина боковых ручек
+    // Обновляем стили для каждой ручки в зависимости от класса
+    handles.forEach(handle => {
+        const pos = handle.classList[1]; // второй класс
+        handle.style.position = 'absolute';
+        handle.style.zIndex = pos.includes('top') || pos.includes('bottom') || pos.includes('left') || pos.includes('right') ? '2' : '3';
+        handle.style.backgroundColor = 'transparent'; // невидимые
+        // Для отладки можно заменить на полупрозрачный цвет:
+        // handle.style.backgroundColor = 'rgba(255,0,0,0.2)';
+        // handle.style.border = '1px solid red';
+
+        switch (pos) {
+            case 'top-left':
+                handle.style.left = '0';
+                handle.style.top = '0';
+                handle.style.width = handleSize + 'px';
+                handle.style.height = handleSize + 'px';
+                handle.style.cursor = 'nw-resize';
+                break;
+            case 'top':
+                handle.style.left = handleSize + 'px';
+                handle.style.top = '0';
+                handle.style.width = `calc(100% - ${2 * handleSize}px)`;
+                handle.style.height = sideWidth + 'px';
+                handle.style.cursor = 'n-resize';
+                break;
+            case 'top-right':
+                handle.style.right = '0';
+                handle.style.top = '0';
+                handle.style.width = handleSize + 'px';
+                handle.style.height = handleSize + 'px';
+                handle.style.cursor = 'ne-resize';
+                break;
+            case 'left':
+                handle.style.left = '0';
+                handle.style.top = handleSize + 'px';
+                handle.style.width = sideWidth + 'px';
+                handle.style.height = `calc(100% - ${2 * handleSize}px)`;
+                handle.style.cursor = 'w-resize';
+                break;
+            case 'right':
+                handle.style.right = '0';
+                handle.style.top = handleSize + 'px';
+                handle.style.width = sideWidth + 'px';
+                handle.style.height = `calc(100% - ${2 * handleSize}px)`;
+                handle.style.cursor = 'e-resize';
+                break;
+            case 'bottom-left':
+                handle.style.left = '0';
+                handle.style.bottom = '0';
+                handle.style.width = handleSize + 'px';
+                handle.style.height = handleSize + 'px';
+                handle.style.cursor = 'sw-resize';
+                break;
+            case 'bottom':
+                handle.style.left = handleSize + 'px';
+                handle.style.bottom = '0';
+                handle.style.width = `calc(100% - ${2 * handleSize}px)`;
+                handle.style.height = sideWidth + 'px';
+                handle.style.cursor = 's-resize';
+                break;
+            case 'bottom-right':
+                handle.style.right = '0';
+                handle.style.bottom = '0';
+                handle.style.width = handleSize + 'px';
+                handle.style.height = handleSize + 'px';
+                handle.style.cursor = 'se-resize';
+                break;
+        }
+    });
+}
+
+// ---------- Функции работы со слоями ----------
+function applyLayerTransform(layer) {
+    const div = document.getElementById(layer.id);
+    if (!div) return;
+
+    // Вычисляем экранные координаты из логических
+    const screenPos = logicalToScreen(layer.x, layer.y);
+    const screenWidth = layer.width * scale;
+    const screenHeight = layer.height * scale;
+
+    div.style.left = screenPos.x + 'px';
+    div.style.top = screenPos.y + 'px';
+    div.style.width = screenWidth + 'px';
+    div.style.height = screenHeight + 'px';
+
+    // Отражение (если нужно)
+    let scaleX = layer.flipX ? -1 : 1;
+    let scaleY = layer.flipY ? -1 : 1;
+    div.style.transform = `scale(${scaleX}, ${scaleY})`;
+
+    // Обновляем ручки ресайза
+    updateResizeHandles(div, screenWidth, screenHeight);
+}
+
+function updateLayerDataFromDiv(div) {
+    const id = div.id;
+    const layer = videoLayers.find(l => l.id === id);
+    if (!layer) return;
+
+    // Экранные координаты из стилей
+    const screenX = parseFloat(div.style.left) || 0;
+    const screenY = parseFloat(div.style.top) || 0;
+    const screenWidth = parseFloat(div.style.width) || 0;
+    const screenHeight = parseFloat(div.style.height) || 0;
+
+    // Преобразуем в логические
+    const logicalPos = screenToLogical(screenX, screenY);
+    layer.x = logicalPos.x;
+    layer.y = logicalPos.y;
+    layer.width = screenWidth / scale;
+    layer.height = screenHeight / scale;
+}
+
+// ---------- Создание слоя ----------
 function createVideoLayer(stream, label, icon, sourceId) {
     const layerId = `layer-${nextLayerId++}`;
     const video = document.createElement('video');
@@ -146,7 +314,7 @@ function createVideoLayer(stream, label, icon, sourceId) {
     video.autoplay = true;
     video.playsInline = true;
     video.muted = false;
-    video.style.pointerEvents = 'none';
+    video.style.pointerEvents = 'none'; // чтобы события мыши проходили к контейнеру и ручкам
 
     const container = document.getElementById('video-layers-container');
     const layerDiv = document.createElement('div');
@@ -168,6 +336,10 @@ function createVideoLayer(stream, label, icon, sourceId) {
     });
     layerDiv.appendChild(closeBtn);
     layerDiv.appendChild(video);
+
+    // Создаём ручки ресайза
+    createResizeHandles(layerDiv);
+
     container.appendChild(layerDiv);
 
     const layerData = {
@@ -184,160 +356,36 @@ function createVideoLayer(stream, label, icon, sourceId) {
         flipX: false,
         flipY: false,
         visible: true,
-        naturalAspect: null // будет заполнено после загрузки метаданных
+        naturalAspect: null
     };
     videoLayers.push(layerData);
 
     video.addEventListener('loadedmetadata', () => {
         layerData.naturalAspect = video.videoWidth / video.videoHeight;
+        console.log('naturalAspect set for', label, layerData.naturalAspect);
     });
 
-    // Инициализация interact.js
-    interact(layerDiv)
-        .draggable({
-            inertia: false,
-            modifiers: [
-                interact.modifiers.snap({
-                    targets: getSnapTargets, // функция будет вызываться каждый раз
-                    range: 5,
-                    relativePoints: [{ x: 0, y: 0 }, { x: 1, y: 1 }]
-                })
-            ],
-            listeners: {
-                move(event) {
-                    const target = event.target;
-                    const x = (parseFloat(target.style.left) || 0) + event.dx;
-                    const y = (parseFloat(target.style.top) || 0) + event.dy;
+    // Обработчик для перетаскивания (клик по самому слою, но не по ручкам)
+    layerDiv.addEventListener('mousedown', (e) => {
+        // Если клик по ручке, не начинаем перетаскивание
+        if (e.target.classList.contains('resize-handle')) return;
+        onLayerMouseDown(e, null); // edge = null означает перетаскивание
+    });
 
-                    target.style.left = x + 'px';
-                    target.style.top = y + 'px';
-
-                    updateLayerDataFromDiv(target);
-                }
-            }
-        })
-        .resizable({
-            edges: { left: true, right: true, bottom: true, top: true },
-            inertia: false,
-            modifiers: [
-                interact.modifiers.snap({
-                    targets: getSnapTargets,
-                    range: 5,
-                    relativePoints: [{ x: 0, y: 0 }, { x: 1, y: 1 }]
-                }),
-                interact.modifiers.restrictSize({
-                    min: { width: 50, height: 30 }
-                })
-            ],
-            listeners: {
-                move(event) {
-                    const target = event.target;
-                    const layer = videoLayers.find(l => l.id === target.id);
-                    if (!layer) return;
-
-                    // Текущие координаты (в пикселях)
-                    let left = parseFloat(target.style.left) || 0;
-                    let top = parseFloat(target.style.top) || 0;
-
-                    // Применяем изменения от ресайза (для левого и верхнего краёв)
-                    left += event.deltaRect.left;
-                    top += event.deltaRect.top;
-
-                    // Базовые размеры после модификаторов (snap и restrict)
-                    let width = event.rect.width;
-                    let height = event.rect.height;
-
-                    // Если зажат Ctrl – восстанавливаем исходное соотношение сторон
-                    if (event.ctrlKey && layer.naturalAspect) {
-                        // Определяем, какое измерение изменилось сильнее
-                        const deltaWidth = event.deltaRect.right - event.deltaRect.left;
-                        const deltaHeight = event.deltaRect.bottom - event.deltaRect.top;
-                        if (Math.abs(deltaWidth) > Math.abs(deltaHeight)) {
-                            // Менялась ширина – подгоняем высоту
-                            height = width / layer.naturalAspect;
-                        } else {
-                            // Менялась высота – подгоняем ширину
-                            width = height * layer.naturalAspect;
-                        }
-                    }
-
-                    // Применяем новые размеры и позицию
-                    target.style.left = left + 'px';
-                    target.style.top = top + 'px';
-                    target.style.width = width + 'px';
-                    target.style.height = height + 'px';
-
-                    // Обновляем данные слоя и карточки
-                    updateLayerDataFromDiv(target);
-                }
-            }
+    // Обработчики для ручек ресайза
+    const handles = layerDiv.querySelectorAll('.resize-handle');
+    handles.forEach(handle => {
+        handle.addEventListener('mousedown', (e) => {
+            e.stopPropagation(); // чтобы не сработал обработчик слоя
+            const edge = handle.dataset.edge;
+            onLayerMouseDown(e, edge);
         });
+    });
 
-    applyLayerTransform(layerData);
     return layerData;
 }
 
-// Обновляем getSnapTargets для работы с динамическими координатами
-function getSnapTargets() {
-    const targets = [
-        // Границы контейнера
-        { x: 0, range: 5 },
-        { x: stageWidth, range: 5 },
-        { y: 0, range: 5 },
-        { y: stageHeight, range: 5 },
-        // Углы
-        { x: 0, y: 0 },
-        { x: stageWidth, y: 0 },
-        { x: 0, y: stageHeight },
-        { x: stageWidth, y: stageHeight }
-    ];
-
-    // Добавляем края других слоёв
-    videoLayers.forEach(layer => {
-        if (!layer.visible) return;
-        const el = document.getElementById(layer.id);
-        if (!el) return;
-        // Координаты уже относительно контейнера (layer.x, layer.y)
-        const left = layer.x;
-        const right = left + layer.width;
-        const top = layer.y;
-        const bottom = top + layer.height;
-
-        targets.push({ x: left, range: 5 });
-        targets.push({ x: right, range: 5 });
-        targets.push({ y: top, range: 5 });
-        targets.push({ y: bottom, range: 5 });
-    });
-
-    return targets;
-}
-// Обновление данных слоя из DOM
-function updateLayerDataFromDiv(div) {
-    const id = div.id;
-    const layer = videoLayers.find(l => l.id === id);
-    if (!layer) return;
-    layer.x = parseFloat(div.style.left) || 0;
-    layer.y = parseFloat(div.style.top) || 0;
-    layer.width = parseFloat(div.style.width) || 0;
-    layer.height = parseFloat(div.style.height) || 0;
-    // transform для отражения не трогаем
-    renderSources(); // обновляем карточки
-}
-
-// Применить трансформацию (отражение)
-function applyLayerTransform(layer) {
-    const div = document.getElementById(layer.id);
-    if (!div) return;
-    div.style.left = layer.x + 'px';
-    div.style.top = layer.y + 'px';
-    div.style.width = layer.width + 'px';
-    div.style.height = layer.height + 'px';
-    let scaleX = layer.flipX ? -1 : 1;
-    let scaleY = layer.flipY ? -1 : 1;
-    div.style.transform = `scale(${scaleX}, ${scaleY})`;
-}
-
-// Удаление слоя
+// ---------- Удаление слоя ----------
 function removeVideoLayer(layerId) {
     const layer = videoLayers.find(l => l.id === layerId);
     if (!layer) return;
@@ -345,7 +393,9 @@ function removeVideoLayer(layerId) {
     layer.stream.getTracks().forEach(t => t.stop());
     // Удаляем из DOM
     const div = document.getElementById(layerId);
-    if (div) div.remove();
+    if (div) {
+        div.remove();
+    }
     // Удаляем из массива
     videoLayers = videoLayers.filter(l => l.id !== layerId);
     // Также удаляем соответствующий источник из mixerState.sources и аудио, если есть
@@ -366,80 +416,261 @@ function removeVideoLayer(layerId) {
     updateMixer();
 }
 
-// ---------- Добавление внешнего источника (аудио + видео) ----------
-async function addSourceToMixer(sourceId, stream, metadata) {
-    // Аудио: если есть дорожки, добавляем в аудиомикшер
-    const audioTracks = stream.getAudioTracks();
-    if (audioTracks.length > 0) {
-        initAudio();
-        const audioStream = new MediaStream(audioTracks.map(t => t.clone()));
-        const sourceNode = audioContext.createMediaStreamSource(audioStream);
-        const gainNode = audioContext.createGain();
-        gainNode.gain.value = (metadata.volume || 100) / 100;
-        sourceNode.connect(gainNode);
-        gainNode.connect(destination);
-        activeSources.set(sourceId, { sourceNode, gainNode, stream: audioStream });
+// ---------- Начало перетаскивания/ресайза ----------
+function onLayerMouseDown(e, edge) {
+    e.preventDefault();
+    const layerDiv = e.currentTarget.closest('.video-layer');
+    if (!layerDiv) return;
+    const layerId = layerDiv.id;
+    const layer = videoLayers.find(l => l.id === layerId);
+    if (!layer) return;
 
-        // Следим за остановкой (если пользователь завершит демонстрацию)
-        audioTracks[0].addEventListener('ended', () => {
-            removeSource(sourceId);
-        });
-    }
+    // Сохраняем начальное состояние
+    dragState.active = true;
+    dragState.layerId = layerId;
+    dragState.startMouseX = e.clientX;
+    dragState.startMouseY = e.clientY;
+    dragState.startLayer = {
+        x: layer.x,
+        y: layer.y,
+        width: layer.width,
+        height: layer.height
+    };
+    dragState.edge = edge;
+    dragState.ctrlPressed = e.ctrlKey;
 
-    // Видео: если есть дорожки, создаём слой
-    const videoTracks = stream.getVideoTracks();
-    if (videoTracks.length > 0) {
-        const videoStream = new MediaStream(videoTracks.map(t => t.clone()));
-        // Создаём слой
-        const layer = createVideoLayer(videoStream, metadata.label, metadata.icon, sourceId);
-
-        // Сохраняем метаданные источника
-        mixerState.sources.push({
-            id: sourceId,
-            label: metadata.label,
-            icon: metadata.icon,
-            volume: metadata.volume || 100,
-            enabled: true,
-            hasAudio: audioTracks.length > 0,
-            layerId: layer.id
-        });
-    } else {
-        // Если нет видео, просто сохраняем как аудиоисточник
-        mixerState.sources.push({
-            id: sourceId,
-            label: metadata.label,
-            icon: metadata.icon,
-            volume: metadata.volume || 100,
-            enabled: true,
-            hasAudio: audioTracks.length > 0,
-            layerId: null
-        });
-    }
-
-    saveState();
-    renderSources();
-    document.getElementById('preview-video').srcObject = destination.stream;
+    // Вешаем глобальные обработчики
+    window.addEventListener('mousemove', onWindowMouseMove);
+    window.addEventListener('mouseup', onWindowMouseUp);
+    window.addEventListener('mouseleave', onWindowMouseUp); // на случай выхода за окно
 }
 
-function removeSource(sourceId) {
-    // Удаляем из активных аудио
-    if (activeSources.has(sourceId)) {
-        const src = activeSources.get(sourceId);
-        src.stream.getTracks().forEach(t => t.stop());
-        src.sourceNode.disconnect();
-        activeSources.delete(sourceId);
+// ---------- Обработка движения мыши ----------
+function onWindowMouseMove(e) {
+    if (!dragState.active) return;
+
+    const layerId = dragState.layerId;
+    const layer = videoLayers.find(l => l.id === layerId);
+    if (!layer) {
+        // Слой мог быть удалён — завершаем операцию
+        onWindowMouseUp(e);
+        return;
     }
 
-    // Удаляем связанный видеослой
-    const source = mixerState.sources.find(s => s.id === sourceId);
-    if (source && source.layerId) {
-        removeVideoLayer(source.layerId);
+    const start = dragState.startLayer;
+    const edge = dragState.edge;
+
+    // Текущие экранные координаты мыши
+    const currentX = e.clientX;
+    const currentY = e.clientY;
+
+    // Смещение мыши в экранных пикселях
+    const deltaX = currentX - dragState.startMouseX;
+    const deltaY = currentY - dragState.startMouseY;
+
+    // Переводим смещение в логические единицы
+    const deltaLogicalX = deltaX / scale;
+    const deltaLogicalY = deltaY / scale;
+
+    // Новые логические параметры (будем изменять)
+    let newX = start.x;
+    let newY = start.y;
+    let newWidth = start.width;
+    let newHeight = start.height;
+
+    if (edge) {
+        // Изменение размера в зависимости от края
+        switch (edge) {
+            case 'left':
+                newX = start.x + deltaLogicalX;
+                newWidth = start.width - deltaLogicalX;
+                break;
+            case 'right':
+                newWidth = start.width + deltaLogicalX;
+                break;
+            case 'top':
+                newY = start.y + deltaLogicalY;
+                newHeight = start.height - deltaLogicalY;
+                break;
+            case 'bottom':
+                newHeight = start.height + deltaLogicalY;
+                break;
+            case 'top-left':
+                newX = start.x + deltaLogicalX;
+                newY = start.y + deltaLogicalY;
+                newWidth = start.width - deltaLogicalX;
+                newHeight = start.height - deltaLogicalY;
+                break;
+            case 'top-right':
+                newY = start.y + deltaLogicalY;
+                newWidth = start.width + deltaLogicalX;
+                newHeight = start.height - deltaLogicalY;
+                break;
+            case 'bottom-left':
+                newX = start.x + deltaLogicalX;
+                newWidth = start.width - deltaLogicalX;
+                newHeight = start.height + deltaLogicalY;
+                break;
+            case 'bottom-right':
+                newWidth = start.width + deltaLogicalX;
+                newHeight = start.height + deltaLogicalY;
+                break;
+        }
+
+        // Ограничения минимального размера
+        const minWidth = 50 / scale;
+        const minHeight = 30 / scale;
+        if (newWidth < minWidth) {
+            if (edge.includes('left')) newX = start.x + start.width - minWidth;
+            newWidth = minWidth;
+        }
+        if (newHeight < minHeight) {
+            if (edge.includes('top')) newY = start.y + start.height - minHeight;
+            newHeight = minHeight;
+        }
+
+        // Если зажат Ctrl и есть naturalAspect, сохраняем пропорции
+        if (dragState.ctrlPressed && layer.naturalAspect) {
+            const aspect = layer.naturalAspect;
+            // Определяем ведущее измерение (то, которое больше изменилось в логических)
+            const deltaW = newWidth - start.width;
+            const deltaH = newHeight - start.height;
+            if (Math.abs(deltaW) > Math.abs(deltaH)) {
+                // Изменялась ширина, подгоняем высоту
+                newHeight = newWidth / aspect;
+                // Корректируем позицию для верхних краёв
+                if (edge.includes('top')) {
+                    newY = start.y + (start.height - newHeight);
+                }
+            } else {
+                // Изменялась высота, подгоняем ширину
+                newWidth = newHeight * aspect;
+                // Корректируем позицию для левых краёв
+                if (edge.includes('left')) {
+                    newX = start.x + (start.width - newWidth);
+                }
+            }
+        }
     } else {
-        // Просто удаляем из массива источников
-        mixerState.sources = mixerState.sources.filter(s => s.id !== sourceId);
-        saveState();
-        renderSources();
+        // Перетаскивание
+        newX = start.x + deltaLogicalX;
+        newY = start.y + deltaLogicalY;
     }
+
+    // Применяем привязку (snap)
+    const snapped = applySnap(newX, newY, newWidth, newHeight, layerId, edge);
+    newX = snapped.x;
+    newY = snapped.y;
+    newWidth = snapped.width;
+    newHeight = snapped.height;
+
+    // Обновляем слой
+    layer.x = newX;
+    layer.y = newY;
+    layer.width = newWidth;
+    layer.height = newHeight;
+
+    // Применяем трансформацию к DOM
+    applyLayerTransform(layer);
+    // Не вызываем renderSources во время движения, чтобы не тормозить
+}
+
+// ---------- Привязка (snap) с радиусом 10 экранных пикселей ----------
+function applySnap(x, y, width, height, excludeLayerId, edge) {
+    const snapRadiusLogical = 10 / scale;
+
+    let snappedX = x;
+    let snappedY = y;
+    let snappedWidth = width;
+    let snappedHeight = height;
+
+    // Функции для привязки сторон
+    const snapLeft = (targetLeft) => {
+        const dist = Math.abs(x - targetLeft);
+        if (dist < snapRadiusLogical) {
+            snappedX = targetLeft;
+            if (edge && (edge.includes('left') || edge.includes('right'))) {
+                snappedWidth = width + (x - targetLeft);
+            }
+        }
+    };
+    const snapRight = (targetRight) => {
+        const dist = Math.abs(x + width - targetRight);
+        if (dist < snapRadiusLogical) {
+            if (edge && (edge.includes('right') || edge.includes('left'))) {
+                snappedWidth = targetRight - x;
+            } else {
+                snappedX = targetRight - width;
+            }
+        }
+    };
+    const snapTop = (targetTop) => {
+        const dist = Math.abs(y - targetTop);
+        if (dist < snapRadiusLogical) {
+            snappedY = targetTop;
+            if (edge && (edge.includes('top') || edge.includes('bottom'))) {
+                snappedHeight = height + (y - targetTop);
+            }
+        }
+    };
+    const snapBottom = (targetBottom) => {
+        const dist = Math.abs(y + height - targetBottom);
+        if (dist < snapRadiusLogical) {
+            if (edge && (edge.includes('bottom') || edge.includes('top'))) {
+                snappedHeight = targetBottom - y;
+            } else {
+                snappedY = targetBottom - height;
+            }
+        }
+    };
+
+    // Цели: границы контейнера
+    const containerLeft = 0;
+    const containerRight = stageWidth;
+    const containerTop = 0;
+    const containerBottom = stageHeight;
+
+    snapLeft(containerLeft);
+    snapRight(containerRight);
+    snapTop(containerTop);
+    snapBottom(containerBottom);
+
+    // Цели: края других слоёв
+    videoLayers.forEach(otherLayer => {
+        if (otherLayer.id === excludeLayerId || !otherLayer.visible) return;
+
+        const otherLeft = otherLayer.x;
+        const otherRight = otherLayer.x + otherLayer.width;
+        const otherTop = otherLayer.y;
+        const otherBottom = otherLayer.y + otherLayer.height;
+
+        snapLeft(otherLeft);
+        snapLeft(otherRight);
+        snapRight(otherLeft);
+        snapRight(otherRight);
+        snapTop(otherTop);
+        snapTop(otherBottom);
+        snapBottom(otherTop);
+        snapBottom(otherBottom);
+    });
+
+    return { x: snappedX, y: snappedY, width: snappedWidth, height: snappedHeight };
+}
+
+// ---------- Завершение операции ----------
+function onWindowMouseUp(e) {
+    if (!dragState.active) return;
+
+    // Убираем глобальные обработчики
+    window.removeEventListener('mousemove', onWindowMouseMove);
+    window.removeEventListener('mouseup', onWindowMouseUp);
+    window.removeEventListener('mouseleave', onWindowMouseUp);
+
+    dragState.active = false;
+
+    // Обновляем карточки после завершения операции
+    renderSources();
+    saveState(); // опционально
 }
 
 // ---------- Рендер карточек источников ----------
@@ -556,7 +787,6 @@ function renderSources() {
             });
 
             moveUpBtn.addEventListener('click', () => {
-                // Переместить слой выше в списке (ниже по z-index)
                 const idx = videoLayers.findIndex(l => l.id === layer.id);
                 if (idx > 0) {
                     [videoLayers[idx], videoLayers[idx-1]] = [videoLayers[idx-1], videoLayers[idx]];
@@ -579,9 +809,76 @@ function updateLayersZIndex() {
     videoLayers.forEach((layer, index) => {
         const div = document.getElementById(layer.id);
         if (div) {
-            div.style.zIndex = index + 1; // Больше индекс = выше
+            div.style.zIndex = index + 1;
         }
     });
+}
+
+// ---------- Добавление внешнего источника (аудио + видео) ----------
+async function addSourceToMixer(sourceId, stream, metadata) {
+    const audioTracks = stream.getAudioTracks();
+    if (audioTracks.length > 0) {
+        initAudio();
+        const audioStream = new MediaStream(audioTracks.map(t => t.clone()));
+        const sourceNode = audioContext.createMediaStreamSource(audioStream);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = (metadata.volume || 100) / 100;
+        sourceNode.connect(gainNode);
+        gainNode.connect(destination);
+        activeSources.set(sourceId, { sourceNode, gainNode, stream: audioStream });
+
+        audioTracks[0].addEventListener('ended', () => {
+            removeSource(sourceId);
+        });
+    }
+
+    const videoTracks = stream.getVideoTracks();
+    if (videoTracks.length > 0) {
+        const videoStream = new MediaStream(videoTracks.map(t => t.clone()));
+        const layer = createVideoLayer(videoStream, metadata.label, metadata.icon, sourceId);
+
+        mixerState.sources.push({
+            id: sourceId,
+            label: metadata.label,
+            icon: metadata.icon,
+            volume: metadata.volume || 100,
+            enabled: true,
+            hasAudio: audioTracks.length > 0,
+            layerId: layer.id
+        });
+    } else {
+        mixerState.sources.push({
+            id: sourceId,
+            label: metadata.label,
+            icon: metadata.icon,
+            volume: metadata.volume || 100,
+            enabled: true,
+            hasAudio: audioTracks.length > 0,
+            layerId: null
+        });
+    }
+
+    saveState();
+    renderSources();
+    document.getElementById('preview-video').srcObject = destination.stream;
+}
+
+function removeSource(sourceId) {
+    if (activeSources.has(sourceId)) {
+        const src = activeSources.get(sourceId);
+        src.stream.getTracks().forEach(t => t.stop());
+        src.sourceNode.disconnect();
+        activeSources.delete(sourceId);
+    }
+
+    const source = mixerState.sources.find(s => s.id === sourceId);
+    if (source && source.layerId) {
+        removeVideoLayer(source.layerId);
+    } else {
+        mixerState.sources = mixerState.sources.filter(s => s.id !== sourceId);
+        saveState();
+        renderSources();
+    }
 }
 
 // ---------- Захват экрана/окна/вкладки ----------
@@ -619,17 +916,8 @@ async function captureScreen() {
             }
         }
 
-        // Генерируем ID источника
         const sourceId = `source-${Date.now()}`;
-
-        // Метаданные
-        const metadata = {
-            label: label,
-            icon: icon,
-            volume: 100
-        };
-
-        // Добавляем в микшер
+        const metadata = { label, icon, volume: 100 };
         await addSourceToMixer(sourceId, stream, metadata);
 
     } catch (err) {
@@ -639,7 +927,7 @@ async function captureScreen() {
     }
 }
 
-// ---------- Сохранение состояния (только микрофоны) ----------
+// ---------- Сохранение состояния ----------
 async function loadState() {
     const data = await chrome.storage.sync.get('audioMixerState');
     if (data.audioMixerState) {
@@ -652,44 +940,41 @@ async function saveState() {
     await chrome.storage.sync.set({ audioMixerState: { devices: mixerState.devices } });
 }
 
-let stageWidth, stageHeight, scale;
-
+// ---------- Управление масштабом сцены ----------
 function setStageSize() {
-    stageWidth = window.innerWidth;
-    stageHeight = window.innerHeight;
     const stage = document.getElementById('video-stage');
     const container = document.getElementById('video-layers-container');
     if (!stage || !container) return;
 
-    const stageRect = stage.getBoundingClientRect();
+    stageRect = stage.getBoundingClientRect();
     const availableWidth = stageRect.width;
     const availableHeight = stageRect.height;
 
-    // Масштаб, чтобы вписать логическую область в доступную
     scale = Math.min(availableWidth / stageWidth, availableHeight / stageHeight);
+
+    containerOffset.x = (availableWidth - stageWidth * scale) / 2;
+    containerOffset.y = (availableHeight - stageHeight * scale) / 2;
 
     container.style.setProperty('--stage-width', stageWidth + 'px');
     container.style.setProperty('--stage-height', stageHeight + 'px');
     container.style.setProperty('--scale', scale);
-    container.style.transform = `scale(${scale})`;
+    container.style.transform = `translate(${containerOffset.x}px, ${containerOffset.y}px) scale(${scale})`;
+
+    // Перерисовываем все слои с новым масштабом
+    videoLayers.forEach(layer => applyLayerTransform(layer));
 }
 
-// Вызываем при загрузке и изменении размера окна
-document.addEventListener('DOMContentLoaded', setStageSize);
-window.addEventListener('resize', setStageSize);
-
+// ---------- Инициализация ----------
 document.addEventListener('DOMContentLoaded', () => {
     setStageSize();
+    loadState().then(async () => {
+        await renderDevices();
+        updateMixer();
+    });
 });
 
 window.addEventListener('resize', () => {
     setStageSize();
-});
-
-// ---------- Инициализация ----------
-loadState().then(async () => {
-    await renderDevices();
-    updateMixer();
 });
 
 // Обработчики UI
@@ -704,7 +989,6 @@ document.getElementById('fullscreen-window-btn')?.addEventListener('click', () =
     document.body.classList.add('fullscreen-mode');
 });
 
-// Выход по Escape внутри iframe
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         window.parent.postMessage({ action: 'exitFullWindow' }, '*');

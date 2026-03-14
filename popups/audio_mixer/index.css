@@ -294,24 +294,40 @@ body.fullscreen-mode #preview-video {
 .video-stage {
     position: relative;
     width: 100%;
-    aspect-ratio: 16 / 9; /* или другое соотношение, можно сделать динамическим */
+    aspect-ratio: 16 / 9; /* или другое, если нужно */
     background: #111;
     border-radius: 0 0 18px 18px;
     overflow: hidden;
-    cursor: default;
     border: 2px dashed rgba(255,255,255,0.3);
     box-sizing: border-box;
+    display: flex;
+    align-items: center;
+    justify-content: center;
 }
 
 .video-layers-container {
     position: absolute;
-    top: 0;
-    left: 0;
     width: var(--stage-width, 1920px);
     height: var(--stage-height, 1080px);
-    transform-origin: top left;
     transform: scale(var(--scale, 1));
+    transform-origin: center center;
     background: rgba(255,255,255,0.02);
     outline: 2px dashed rgba(255,255,255,0.5);
     outline-offset: -2px;
 }
+
+.resize-handle {
+    position: absolute;
+    background: transparent; /* невидимые */
+    background: rgba(255, 0, 255, 0.8);
+    border: 1px solid rgba(255, 0, 255, 0.8);
+}
+
+.resize-handle.top-left { cursor: nw-resize; }
+.resize-handle.top { cursor: n-resize; }
+.resize-handle.top-right { cursor: ne-resize; }
+.resize-handle.left { cursor: w-resize; }
+.resize-handle.right { cursor: e-resize; }
+.resize-handle.bottom-left { cursor: sw-resize; }
+.resize-handle.bottom { cursor: s-resize; }
+.resize-handle.bottom-right { cursor: se-resize; }
