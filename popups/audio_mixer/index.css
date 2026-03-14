@@ -264,6 +264,15 @@ body.fullscreen-mode #preview-video {
     object-fit: contain !important;
 }
 
+body.fullscreen-mode #fullscreen-window-btn{
+    display: none;
+}
+
+body.fullscreen-mode{
+    max-width:100vw;
+    max-height:100vh;
+    overflow:hidden;
+}
 /* ---------- Видео-микшер ---------- */
 .video-stage-wrapper {
     position: relative;
