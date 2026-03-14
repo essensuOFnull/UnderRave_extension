@@ -1,7 +1,7 @@
 let mixerTabId = null;
 
 export function init() {
-    // Пункт контекстного меню
+    // Контекстное меню (как было с getDisplayMedia)
     chrome.contextMenus.remove('replace-mic-with-desktop', () => {});
     chrome.contextMenus.create({
         id: 'replace-mic-with-desktop',
@@ -11,7 +11,6 @@ export function init() {
 
     chrome.contextMenus.onClicked.addListener((info, tab) => {
         if (info.menuItemId === 'replace-mic-with-desktop') {
-            // Внедряем скрипт, который вызовет getDisplayMedia и подменит getUserMedia
             chrome.scripting.executeScript({
                 target: { tabId: tab.id, allFrames: true },
                 world: 'MAIN',
@@ -21,7 +20,7 @@ export function init() {
         }
     });
 
-    // Обработчики сообщений (остаются без изменений)
+    // Регистрация вкладки микшера
     chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
         if (message.action === 'registerMixerTab') {
             if (sender.tab) {
@@ -32,38 +31,7 @@ export function init() {
                 sendResponse({ ok: false });
             }
         }
-        else if (message.action === 'getMixerTabStreamId') {
-            const consumerTabId = message.consumerTabId;
-            if (!mixerTabId || !consumerTabId) {
-                console.warn('getMixerTabStreamId: missing mixerTabId or consumerTabId');
-                sendResponse({ streamId: null });
-                return;
-            }
-            chrome.tabCapture.getMediaStreamId(
-                { targetTabId: mixerTabId, consumerTabId },
-                (streamId) => {
-                    if (chrome.runtime.lastError) {
-                        console.error('getMediaStreamId error:', chrome.runtime.lastError);
-                        sendResponse({ streamId: null });
-                    } else {
-                        console.log('getMediaStreamId success, streamId:', streamId);
-                        sendResponse({ streamId: streamId || null });
-                    }
-                }
-            );
-            return true; // асинхронный ответ
-        }
-        else if (message.action === 'getTabStreamId') {
-            const { tabId } = message;
-            chrome.tabCapture.getMediaStreamId({ targetTabId: tabId }, (streamId) => {
-                if (chrome.runtime.lastError) {
-                    sendResponse({ streamId: null, error: chrome.runtime.lastError });
-                } else {
-                    sendResponse({ streamId: streamId || null });
-                }
-            });
-            return true;
-        }
+        // Другие сообщения не нужны
     });
 }
 

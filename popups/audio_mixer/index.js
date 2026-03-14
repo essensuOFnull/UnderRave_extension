@@ -1,9 +1,76 @@
 let audioContext, destination;
 let activeSources = new Map(); // ключ: deviceId или `tab-${tabId}`
 let mixerState = { devices: [], tabs: [] };
+let listenGainNode; // узел для регулировки громкости прослушивания
+let isListening = true;
+let listenSourceNode; // для сохранения источника прослушивания
+let isCapturePending = false; // защита от одновременных диалогов
 
 // Регистрируем эту вкладку как микшер (используем sender.tab.id в фоне)
 chrome.runtime.sendMessage({ action: 'registerMixerTab' });
+
+async function captureTabAudio(tabState) {
+    if (isCapturePending) {
+        alert('Подождите завершения текущего выбора источника');
+        // Сбрасываем чекбокс
+        tabState.enabled = false;
+        const checkbox = document.querySelector(`input[data-tab-id="${tabState.tabId}"]`);
+        if (checkbox) checkbox.checked = false;
+        return;
+    }
+
+    const key = `tab-${tabState.tabId}`;
+    if (activeSources.has(key)) return;
+
+    isCapturePending = true;
+    try {
+        const streamId = await new Promise((resolve, reject) => {
+            chrome.desktopCapture.chooseDesktopMedia(
+                ['tab', 'audio'], // можно добавить 'window', 'screen'
+                (streamId) => {
+                    if (chrome.runtime.lastError || !streamId) {
+                        reject(chrome.runtime.lastError || new Error('No streamId'));
+                    } else {
+                        resolve(streamId);
+                    }
+                }
+            );
+        });
+
+        const stream = await navigator.mediaDevices.getUserMedia({
+            audio: {
+                mandatory: {
+                    chromeMediaSource: 'desktop',
+                    chromeMediaSourceId: streamId
+                }
+            },
+            video: false
+        });
+
+        if (stream.getAudioTracks().length === 0) {
+            throw new Error('Выбранный источник не содержит аудиодорожек');
+        }
+
+        const sourceNode = audioContext.createMediaStreamSource(stream);
+        const gainNode = audioContext.createGain();
+        gainNode.gain.value = (tabState.volume || 100) / 100;
+        sourceNode.connect(gainNode);
+        gainNode.connect(destination);
+        activeSources.set(key, { sourceNode, gainNode, stream });
+
+        // Обновляем видео-превью (на всякий случай)
+        document.getElementById('preview-video').srcObject = destination.stream;
+    } catch (err) {
+        console.error('Ошибка захвата вкладки:', err);
+        tabState.enabled = false;
+        saveState();
+        const checkbox = document.querySelector(`input[data-tab-id="${tabState.tabId}"]`);
+        if (checkbox) checkbox.checked = false;
+        alert('Не удалось захватить аудио из выбранного источника. Возможно, источник не содержит звука.');
+    } finally {
+        isCapturePending = false;
+    }
+}
 
 // ---------- Загрузка/сохранение состояния ----------
 async function loadState() {
@@ -22,6 +89,13 @@ function initAudio() {
     if (!audioContext) {
         audioContext = new AudioContext();
         destination = audioContext.createMediaStreamDestination();
+
+        listenGainNode = audioContext.createGain();
+        listenGainNode.gain.value = 1.0;
+        
+        listenSourceNode = audioContext.createMediaStreamSource(destination.stream);
+        listenSourceNode.connect(listenGainNode);
+        listenGainNode.connect(audioContext.destination);
     }
     if (audioContext.state === 'suspended') audioContext.resume();
 }
@@ -71,7 +145,7 @@ async function updateMixer() {
         src.gainNode.gain.value = volume / 100;
     }
 
-    // 3. Добавляем новые источники
+    // 3. Добавляем новые микрофоны (они не требуют диалога)
     for (let dev of mixerState.devices) {
         if (dev.enabled && !activeSources.has(dev.id)) {
             try {
@@ -86,42 +160,6 @@ async function updateMixer() {
                 activeSources.set(dev.id, { sourceNode, gainNode, stream });
             } catch (e) {
                 console.warn('Не удалось захватить микрофон', dev, e);
-            }
-        }
-    }
-
-    for (let tab of mixerState.tabs) {
-        const key = `tab-${tab.tabId}`;
-        if (tab.enabled && !activeSources.has(key)) {
-            try {
-                const streamId = await new Promise((resolve, reject) => {
-                    chrome.runtime.sendMessage(
-                        { action: 'getTabStreamId', tabId: tab.tabId },
-                        (response) => {
-                            if (response?.streamId) resolve(response.streamId);
-                            else reject(new Error('Не удалось получить streamId'));
-                        }
-                    );
-                });
-
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: {
-                        mandatory: {
-                            chromeMediaSource: 'tab',
-                            chromeMediaSourceId: streamId
-                        }
-                    },
-                    video: false
-                });
-
-                const sourceNode = audioContext.createMediaStreamSource(stream);
-                const gainNode = audioContext.createGain();
-                gainNode.gain.value = (tab.volume || 100) / 100;
-                sourceNode.connect(gainNode);
-                gainNode.connect(destination);
-                activeSources.set(key, { sourceNode, gainNode, stream });
-            } catch (e) {
-                console.warn('Не удалось захватить вкладку', tab, e);
             }
         }
     }
@@ -186,6 +224,14 @@ async function renderDevices() {
     });
 }
 
+async function restoreEnabledTabs() {
+    for (let tabState of mixerState.tabs) {
+        if (tabState.enabled) {
+            await captureTabAudio(tabState);
+        }
+    }
+}
+
 // ---------- Рендер вкладок ----------
 async function renderTabs() {
     const tabs = await chrome.tabs.query({});
@@ -232,11 +278,22 @@ async function renderTabs() {
         const slider = tabDiv.querySelector('.volume-slider');
         const span = tabDiv.querySelector('.volume-value');
 
-        checkbox.addEventListener('change', (e) => {
+        checkbox.addEventListener('change', async (e) => {
             tabState.enabled = e.target.checked;
+            if (tabState.enabled) {
+                await captureTabAudio(tabState);
+            } else {
+                const key = `tab-${tabState.tabId}`;
+                if (activeSources.has(key)) {
+                    const src = activeSources.get(key);
+                    src.stream.getTracks().forEach(t => t.stop());
+                    src.sourceNode.disconnect();
+                    activeSources.delete(key);
+                }
+            }
             sourceList.style.display = tabState.enabled ? 'block' : 'none';
             saveState();
-            updateMixer();
+            // Не вызываем updateMixer – активные источники уже обновлены
         });
 
         slider.addEventListener('input', (e) => {
@@ -249,20 +306,49 @@ async function renderTabs() {
     }
 }
 
-// ---------- Открытие output.html ----------
-async function openOutputTab() {
-    const url = chrome.runtime.getURL('popups/audio_mixer/output.html');
-    await chrome.tabs.create({ url, active: false });
-}
-
 // ---------- Инициализация ----------
-loadState().then(() => {
-    renderDevices();
-    renderTabs();
-    updateMixer();
+loadState().then(async () => {
+    await renderDevices();
+    await renderTabs();
+    await restoreEnabledTabs(); // <-- добавить
+    updateMixer(); // обновит микрофоны и громкость
 });
 
-document.getElementById('open-output-tab').addEventListener('click', openOutputTab);
+document.getElementById('listen-volume').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    document.getElementById('listen-volume-value').textContent = val + '%';
+    if (listenGainNode) listenGainNode.gain.value = val / 100;
+});
+
+isListening = true;
+document.getElementById('toggle-listen').addEventListener('click', (e) => {
+    if (isListening) {
+        listenGainNode.disconnect();
+        e.target.textContent = '▶️ Возобновить';
+    } else {
+        listenGainNode.connect(audioContext.destination);
+        e.target.textContent = '⏸️ Приостановить';
+    }
+    isListening = !isListening;
+});
+
 document.getElementById('fullscreen-btn').addEventListener('click', () => {
     document.getElementById('preview-video').requestFullscreen();
+});
+
+document.getElementById('listen-volume').addEventListener('input', (e) => {
+    const val = parseInt(e.target.value);
+    document.getElementById('listen-volume-value').textContent = val + '%';
+    if (listenGainNode) listenGainNode.gain.value = val / 100;
+});
+
+document.getElementById('toggle-listen').addEventListener('click', (e) => {
+    if (isListening) {
+        listenGainNode.disconnect();
+        e.target.textContent = '▶️ Возобновить';
+    } else {
+        listenGainNode.connect(audioContext.destination);
+        e.target.textContent = '⏸️ Приостановить';
+    }
+    isListening = !isListening;
 });
