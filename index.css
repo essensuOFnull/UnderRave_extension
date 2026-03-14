@@ -105,3 +105,24 @@ body.fullscreen-mode .tab-content.active iframe {
     height: 100% !important;
     border: none !important;
 }
+
+body.fullscreen-mode .tabs,
+body.fullscreen-mode .tab-content:not(.active) {
+    display: none !important;
+}
+body.fullscreen-mode .tab-content.active {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: black !important;
+    z-index: 10000 !important;
+}
+body.fullscreen-mode .tab-content.active iframe {
+    width: 100% !important;
+    height: 100% !important;
+    border: none !important;
+}

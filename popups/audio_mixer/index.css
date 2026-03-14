@@ -76,7 +76,7 @@
 #preview-container {
 	margin: 20px 0;
 	background: #000;
-	border-radius: 12px;
+	border-radius: 18px 18px 0 0;
 	overflow: hidden;
 	position: relative;
 }
@@ -104,19 +104,173 @@
 }
 .hidden { display: none; }
 
-/* Режим разворачивания видео на всю вкладку */
-body.fullscreen-mode {
+.video-layer {
+    position: absolute;
+    display: block;
+    background: #000;
+    border: 2px solid rgba(255, 255, 255, 0.3);
+    box-sizing: border-box;
+    cursor: move;
+    user-select: none;
+    transition: border-color 0.2s;
+}
+
+.video-layer:hover {
+    border-color: #4a9eff;
+}
+
+.video-layer video {
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none; /* Чтобы события мыши проходили через видео к контейнеру для drag */
+}
+
+/* Кнопка закрытия слоя */
+.layer-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 20px; /* Смещение влево, чтобы не мешать захвату за правый верхний угол */
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.7);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.5);
+    border-radius: 12px;
+    font-size: 16px;
+    line-height: 1;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-layer:hover .layer-close-btn {
+    opacity: 1;
+}
+
+.layer-close-btn:hover {
+    background: rgba(255, 0, 0, 0.8);
+    border-color: white;
+}
+
+/* Ползунки в карточках */
+.source-item {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    padding: 0.3rem 0;
+}
+
+.source-item label {
+    font-size: 0.9rem;
+    color: #1e293b;
+    flex: 1;
+}
+
+.volume-slider {
+    width: 120px;
+    height: 4px;
+    accent-color: #1e293b;
+}
+
+.volume-value {
+    min-width: 40px;
+    font-size: 0.8rem;
+    color: #4b5563;
+}
+
+/* Кнопка удаления источника в карточке */
+.remove-source {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: #e53e3e;
+    font-size: 1.2rem;
+    margin-left: 0.5rem;
+}
+
+/* Карточка источника */
+.source-card {
+    background: #f8fafd;
+    border-radius: 12px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid #e2e8f0;
+}
+
+.source-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.source-header .source-icon {
+    font-size: 1.4rem;
+    width: 24px;
+    text-align: center;
+}
+
+.source-header .source-title {
+    flex: 1;
+    font-weight: 500;
+    white-space: nowrap;
     overflow: hidden;
+    text-overflow: ellipsis;
 }
-body.fullscreen-mode #main_grid,
-body.fullscreen-mode .tabs,
-body.fullscreen-mode h1,
-body.fullscreen-mode p,
-body.fullscreen-mode .settings-card,
-body.fullscreen-mode #add-screen-source-btn,
-body.fullscreen-mode #fullscreen-window-btn {
-    display: none !important;
+
+.source-details {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
 }
+
+/* Элементы управления видео в карточке */
+.video-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed #cbd5e0;
+}
+
+.video-control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+}
+
+.video-control-group input[type="number"] {
+    width: 60px;
+    padding: 0.2rem;
+    border: 1px solid #cbd5e0;
+    border-radius: 4px;
+}
+
+.video-control-group button {
+    background: #e2e8f0;
+    border: none;
+    border-radius: 4px;
+    padding: 0.2rem 0.5rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+}
+
+.video-control-group button:hover {
+    background: #cbd5e0;
+}
+
+.settings-card,.column,.body{
+    min-width: max-content;
+    width:100%;
+}
+
 body.fullscreen-mode #preview-container {
     position: fixed !important;
     top: 0 !important;
@@ -134,4 +288,30 @@ body.fullscreen-mode #preview-video {
     height: 100% !important;
     max-height: none !important;
     object-fit: contain !important;
+}
+
+/* Видео-микшер */
+.video-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 16 / 9; /* или другое соотношение, можно сделать динамическим */
+    background: #111;
+    border-radius: 0 0 18px 18px;
+    overflow: hidden;
+    cursor: default;
+    border: 2px dashed rgba(255,255,255,0.3);
+    box-sizing: border-box;
+}
+
+.video-layers-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--stage-width, 1920px);
+    height: var(--stage-height, 1080px);
+    transform-origin: top left;
+    transform: scale(var(--scale, 1));
+    background: rgba(255,255,255,0.02);
+    outline: 2px dashed rgba(255,255,255,0.5);
+    outline-offset: -2px;
 }

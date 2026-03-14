@@ -15,7 +15,7 @@ document.querySelectorAll('.tab-button').forEach(button => {
 window.addEventListener('message', (event) => {
     if (event.data.action === 'enterFullWindow') {
         document.body.classList.add('fullscreen-mode');
-    }else if (event.data.action === 'exitFullWindow') {
+    } else if (event.data.action === 'exitFullWindow') {
         document.body.classList.remove('fullscreen-mode');
     }
 });
