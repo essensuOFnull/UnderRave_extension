@@ -1,6 +1,6 @@
 let audioContext, destination;
 let activeSources = new Map(); // ключ: deviceId или `tab-${tabId}`
-let mixerState = { devices: [], tabs: [] };
+let mixerState = { devices: [], sources: [] };
 let listenGainNode; // узел для регулировки громкости прослушивания
 let isListening = true;
 let listenSourceNode; // для сохранения источника прослушивания
@@ -82,9 +82,13 @@ function updateCheckbox(tabId, checked) {
 // ---------- Загрузка/сохранение состояния ----------
 async function loadState() {
     const data = await chrome.storage.sync.get('audioMixerState');
-    if (data.audioMixerState) mixerState = data.audioMixerState;
+    if (data.audioMixerState) {
+        mixerState = data.audioMixerState;
+        // Очищаем источники, так как они не могут быть восстановлены
+        mixerState.sources = [];
+    }
     mixerState.devices = mixerState.devices || [];
-    mixerState.tabs = mixerState.tabs || [];
+    mixerState.sources = mixerState.sources || [];
 }
 
 async function saveState() {
@@ -122,43 +126,23 @@ async function getDevices() {
 async function updateMixer() {
     initAudio();
 
-    // 1. Удаляем источники, которые больше не включены
+    // Удаляем микрофоны, которые отключены
     for (let [key, src] of activeSources.entries()) {
-        let shouldKeep = false;
-        if (key.startsWith('tab-')) {
-            const tabId = parseInt(key.slice(4));
-            shouldKeep = mixerState.tabs.some(t => t.tabId === tabId && t.enabled);
-        } else {
-            shouldKeep = mixerState.devices.some(d => d.id === key && d.enabled);
-        }
-        if (!shouldKeep) {
-            src.stream.getTracks().forEach(t => t.stop());
-            src.sourceNode.disconnect();
-            activeSources.delete(key);
+        if (!key.startsWith('source-')) { // предполагаем, что ключи микрофонов – это deviceId, а не source-*
+            let shouldKeep = mixerState.devices.some(d => d.id === key && d.enabled);
+            if (!shouldKeep) {
+                src.stream.getTracks().forEach(t => t.stop());
+                src.sourceNode.disconnect();
+                activeSources.delete(key);
+            }
         }
     }
 
-    // 2. Обновляем громкость у существующих
-    for (let [key, src] of activeSources.entries()) {
-        let volume = 100;
-        if (key.startsWith('tab-')) {
-            const tabId = parseInt(key.slice(4));
-            const tab = mixerState.tabs.find(t => t.tabId === tabId);
-            if (tab) volume = tab.volume;
-        } else {
-            const dev = mixerState.devices.find(d => d.id === key);
-            if (dev) volume = dev.volume;
-        }
-        src.gainNode.gain.value = volume / 100;
-    }
-
-    // 3. Добавляем новые микрофоны (они не требуют диалога)
+    // Добавляем новые микрофоны
     for (let dev of mixerState.devices) {
         if (dev.enabled && !activeSources.has(dev.id)) {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({
-                    audio: { deviceId: dev.id }
-                });
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: dev.id } });
                 const sourceNode = audioContext.createMediaStreamSource(stream);
                 const gainNode = audioContext.createGain();
                 gainNode.gain.value = dev.volume / 100;
@@ -169,6 +153,19 @@ async function updateMixer() {
                 console.warn('Не удалось захватить микрофон', dev, e);
             }
         }
+    }
+
+    // Обновляем громкость всех активных (и микрофонов, и источников)
+    for (let [key, src] of activeSources.entries()) {
+        let volume = 100;
+        if (key.startsWith('source-')) {
+            const source = mixerState.sources.find(s => s.id === key);
+            if (source) volume = source.volume;
+        } else {
+            const dev = mixerState.devices.find(d => d.id === key);
+            if (dev) volume = dev.volume;
+        }
+        src.gainNode.gain.value = volume / 100;
     }
 
     document.getElementById('preview-video').srcObject = destination.stream;
@@ -238,85 +235,107 @@ async function restoreEnabledTabs() {
         }
     }
 }
+/*функции источников*/
+async function addSourceToMixer(sourceId, stream, volume = 100) {
+    initAudio();
 
-// ---------- Рендер вкладок ----------
-async function renderTabs() {
-    const tabs = await chrome.tabs.query({});
-    const validTabs = tabs.filter(t => !t.url.startsWith(chrome.runtime.getURL('')));
+    const sourceNode = audioContext.createMediaStreamSource(stream);
+    const gainNode = audioContext.createGain();
+    gainNode.gain.value = volume / 100;
+    sourceNode.connect(gainNode);
+    gainNode.connect(destination);
 
-    mixerState.tabs = mixerState.tabs.filter(t => validTabs.some(tab => tab.id === t.tabId));
-
-    for (let tab of validTabs) {
-        if (!mixerState.tabs.some(t => t.tabId === tab.id)) {
-            mixerState.tabs.push({
-                tabId: tab.id,
-                title: tab.title || 'Вкладка',
-                enabled: false,
-                volume: 100
-            });
-        }
+    activeSources.set(sourceId, { sourceNode, gainNode, stream });
+    document.getElementById('preview-video').srcObject = destination.stream;
+}
+function removeSource(sourceId) {
+    // Удаляем из активных
+    if (activeSources.has(sourceId)) {
+        const src = activeSources.get(sourceId);
+        src.stream.getTracks().forEach(t => t.stop());
+        src.sourceNode.disconnect();
+        activeSources.delete(sourceId);
     }
 
-    mixerState.tabs.sort((a, b) => a.tabId - b.tabId);
-
-    const container = document.getElementById('tabs-section');
+    // Удаляем из состояния
+    mixerState.sources = mixerState.sources.filter(s => s.id !== sourceId);
+    saveState();
+    renderSources();
+}
+function renderSources() {
+    const container = document.getElementById('sources-list');
     container.innerHTML = '';
 
-    for (let tabState of mixerState.tabs) {
-        const tabDiv = document.createElement('div');
-        tabDiv.className = 'tab-item';
-        tabDiv.innerHTML = `
-            <div class="tab-header">
-                <input type="checkbox" ${tabState.enabled ? 'checked' : ''} data-tab-id="${tabState.tabId}">
-                <span>${tabState.title}</span>
+    mixerState.sources.forEach(source => {
+        const div = document.createElement('div');
+        div.className = 'device-item';
+        div.innerHTML = `
+            <div class="device-header">
+                <input type="checkbox" ${source.enabled ? 'checked' : ''} data-id="${source.id}">
+                <label>${source.label}</label>
+                <button class="remove-source" data-id="${source.id}">✖</button>
             </div>
-            <div class="source-list" style="display: ${tabState.enabled ? 'block' : 'none'};">
+            <div class="source-list" style="display: ${source.enabled ? 'block' : 'none'};">
                 <div class="source-item">
-                    <label>Громкость всей вкладки</label>
-                    <input type="range" min="0" max="100" value="${tabState.volume}" class="volume-slider" data-tab-id="${tabState.tabId}">
-                    <span class="volume-value">${tabState.volume}%</span>
+                    <label>Громкость</label>
+                    <input type="range" min="0" max="100" value="${source.volume}" class="volume-slider" data-id="${source.id}">
+                    <span class="volume-value">${source.volume}%</span>
                 </div>
             </div>
         `;
-        container.appendChild(tabDiv);
 
-        const checkbox = tabDiv.querySelector('input[type="checkbox"]');
-        const sourceList = tabDiv.querySelector('.source-list');
-        const slider = tabDiv.querySelector('.volume-slider');
-        const span = tabDiv.querySelector('.volume-value');
+        container.appendChild(div);
 
-        checkbox.addEventListener('change', async (e) => {
-            tabState.enabled = e.target.checked;
-            if (tabState.enabled) {
-                await captureTabAudio(tabState);
+        const checkbox = div.querySelector('input[type="checkbox"]');
+        const sourceList = div.querySelector('.source-list');
+        const slider = div.querySelector('.volume-slider');
+        const span = div.querySelector('.volume-value');
+        const removeBtn = div.querySelector('.remove-source');
+
+        checkbox.addEventListener('change', (e) => {
+            source.enabled = e.target.checked;
+            if (source.enabled) {
+                // Включаем – если поток ещё жив, просто обновляем громкость
+                // Если поток был остановлен, нужно заново запросить? Лучше не давать включать, если поток мёртв.
+                // В упрощённом варианте: при включении проверяем, есть ли активный источник, если нет – показываем ошибку.
+                if (activeSources.has(source.id)) {
+                    sourceList.style.display = 'block';
+                } else {
+                    alert('Источник недоступен. Попробуйте добавить его заново.');
+                    source.enabled = false;
+                    checkbox.checked = false;
+                }
             } else {
-                const key = `tab-${tabState.tabId}`;
-                if (activeSources.has(key)) {
-                    const src = activeSources.get(key);
+                sourceList.style.display = 'none';
+                // Останавливаем поток
+                if (activeSources.has(source.id)) {
+                    const src = activeSources.get(source.id);
                     src.stream.getTracks().forEach(t => t.stop());
                     src.sourceNode.disconnect();
-                    activeSources.delete(key);
+                    activeSources.delete(source.id);
                 }
             }
-            sourceList.style.display = tabState.enabled ? 'block' : 'none';
             saveState();
-            // Не вызываем updateMixer – активные источники уже обновлены
         });
 
         slider.addEventListener('input', (e) => {
             const val = parseInt(e.target.value);
-            tabState.volume = val;
+            source.volume = val;
             span.textContent = val + '%';
+            if (activeSources.has(source.id)) {
+                activeSources.get(source.id).gainNode.gain.value = val / 100;
+            }
             saveState();
-            updateMixer();
         });
-    }
-}
 
+        removeBtn.addEventListener('click', () => {
+            removeSource(source.id);
+        });
+    });
+}
 // ---------- Инициализация ----------
 loadState().then(async () => {
     await renderDevices();
-    await renderTabs();
     await restoreEnabledTabs();
     updateMixer();
 });
@@ -358,4 +377,52 @@ document.getElementById('toggle-listen').addEventListener('click', (e) => {
         e.target.textContent = '⏸️ Приостановить';
     }
     isListening = !isListening;
+});
+
+document.getElementById('add-source-btn').addEventListener('click', async () => {
+    try {
+        const stream = await navigator.mediaDevices.getDisplayMedia({
+            audio: true,
+            video: true // видео нужно, чтобы получить аудио из некоторых источников; потом остановим
+        });
+
+        // Останавливаем видео, оставляем только аудио
+        stream.getVideoTracks().forEach(track => track.stop());
+        const audioTracks = stream.getAudioTracks();
+        if (audioTracks.length === 0) {
+            alert('Выбранный источник не содержит аудио');
+            return;
+        }
+
+        // Получаем метку для отображения (берём из первого аудиотрека)
+        const label = audioTracks[0].label || 'Источник';
+        const sourceId = `source-${Date.now()}`;
+
+        // Добавляем в состояние
+        mixerState.sources.push({
+            id: sourceId,
+            label: label,
+            enabled: true,
+            volume: 100,
+            stream: stream // сохраняем поток в состоянии (но осторожно: поток не сериализуется, его нельзя сохранить в storage)
+        });
+
+        // Сохраняем состояние (без потока) в storage
+        saveState();
+
+        // Добавляем в активные источники
+        await addSourceToMixer(sourceId, stream, 100);
+
+        // Рендерим обновлённый список
+        renderSources();
+
+        // Следим за остановкой пользователем
+        audioTracks[0].addEventListener('ended', () => {
+            console.log('Источник остановлен пользователем:', sourceId);
+            removeSource(sourceId);
+        });
+
+    } catch (err) {
+        console.error('Ошибка при выборе источника:', err);
+    }
 });
