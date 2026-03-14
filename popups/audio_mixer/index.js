@@ -1,5 +1,6 @@
 // popups/audio_mixer/index.js
 // Версия с ручками ресайза (8 областей)
+let compressor;
 
 let audioContext, destination;
 let activeSources = new Map(); // ключ: sourceId (для аудио)
@@ -48,16 +49,28 @@ function logicalToScreen(logicalX, logicalY) {
 
 // ---------- Инициализация аудио (без изменений) ----------
 function initAudio() {
-	if (!audioContext) {
-		audioContext = new AudioContext();
-		destination = audioContext.createMediaStreamDestination();
-		listenGainNode = audioContext.createGain();
-		listenGainNode.gain.value = 1.0;
-		const listenSource = audioContext.createMediaStreamSource(destination.stream);
-		listenSource.connect(listenGainNode);
-		listenGainNode.connect(audioContext.destination);
-	}
-	if (audioContext.state === 'suspended') audioContext.resume();
+    if (!audioContext) {
+        audioContext = new AudioContext();
+        destination = audioContext.createMediaStreamDestination();
+        
+        // Создаём компрессор
+        compressor = audioContext.createDynamicsCompressor();
+        compressor.threshold.value = -20;   // порог срабатывания, дБ
+        compressor.knee.value = 10;         // мягкость ограничения
+        compressor.ratio.value = 12;        // степень сжатия
+        compressor.attack.value = 0.003;    // время атаки, сек
+        compressor.release.value = 0.25;    // время восстановления, сек
+
+        listenGainNode = audioContext.createGain();
+        listenGainNode.gain.value = 1.0;
+
+        // Соединяем: destination -> compressor -> listenGainNode -> destination (аудиовыход)
+        const listenSource = audioContext.createMediaStreamSource(destination.stream);
+        listenSource.connect(compressor);
+        compressor.connect(listenGainNode);
+        listenGainNode.connect(audioContext.destination);
+    }
+    if (audioContext.state === 'suspended') audioContext.resume();
 }
 
 // ---------- Микрофоны (без изменений) ----------
@@ -72,48 +85,53 @@ async function getDevices() {
 }
 
 async function updateMixer() {
-	initAudio();
+    initAudio();
 
-	// Останавливаем отключенные микрофоны
-	for (let [key, src] of activeSources.entries()) {
-		if (!key.startsWith('source-')) {
-			let shouldKeep = mixerState.devices.some(d => d.id === key && d.enabled);
-			if (!shouldKeep) {
-				src.stream.getTracks().forEach(t => t.stop());
-				src.sourceNode.disconnect();
-				activeSources.delete(key);
-			}
-		}
-	}
+    // Останавливаем микрофоны, которые отключены
+    for (let [key, src] of activeSources.entries()) {
+        if (!key.startsWith('source-')) { // значит, это микрофон
+            let shouldKeep = mixerState.devices.some(d => d.id === key && d.enabled);
+            if (!shouldKeep) {
+                src.stream.getTracks().forEach(t => t.stop());
+                src.sourceNode.disconnect();
+                activeSources.delete(key);
+            }
+        }
+    }
 
-	// Добавляем новые микрофоны
-	for (let dev of mixerState.devices) {
-		if (dev.enabled && !activeSources.has(dev.id)) {
-			try {
-				const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: dev.id } });
-				const sourceNode = audioContext.createMediaStreamSource(stream);
-				const gainNode = audioContext.createGain();
-				gainNode.gain.value = dev.volume / 100;
-				sourceNode.connect(gainNode);
-				gainNode.connect(destination);
-				activeSources.set(dev.id, { sourceNode, gainNode, stream });
-			} catch (e) {
-				console.warn('Не удалось захватить микрофон', dev, e);
-			}
-		}
-	}
+    // Добавляем новые микрофоны
+    for (let dev of mixerState.devices) {
+        if (dev.enabled && !activeSources.has(dev.id)) {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: { deviceId: dev.id } });
+                const sourceNode = audioContext.createMediaStreamSource(stream);
+                const gainNode = audioContext.createGain();
+                gainNode.gain.value = dev.volume / 100;
+                sourceNode.connect(gainNode);
+                gainNode.connect(destination);
+                activeSources.set(dev.id, { sourceNode, gainNode, stream });
+            } catch (e) {
+                console.warn('Не удалось захватить микрофон', dev, e);
+            }
+        }
+    }
 
-	// Обновляем громкость аудиоисточников (внешних)
-	for (let [key, src] of activeSources.entries()) {
-		if (key.startsWith('source-')) {
-			const source = mixerState.sources.find(s => s.id === key);
-			if (source && src.gainNode) {
-				src.gainNode.gain.value = source.volume / 100;
-			}
-		}
-	}
+    // Обновляем громкость ВСЕХ активных источников (и микрофонов, и внешних)
+    for (let [key, src] of activeSources.entries()) {
+        let targetVolume = 100; // по умолчанию
+        if (key.startsWith('source-')) {
+            const source = mixerState.sources.find(s => s.id === key);
+            if (source) targetVolume = source.volume;
+        } else {
+            const dev = mixerState.devices.find(d => d.id === key);
+            if (dev) targetVolume = dev.volume;
+        }
+        if (src.gainNode) {
+            src.gainNode.gain.value = targetVolume / 100;
+        }
+    }
 
-	document.getElementById('preview-video').srcObject = destination.stream;
+    document.getElementById('preview-video').srcObject = destination.stream;
 }
 
 async function renderDevices() {
@@ -167,8 +185,14 @@ async function renderDevices() {
 			const val = parseInt(e.target.value);
 			devState.volume = val;
 			span.textContent = val + '%';
-			saveState();
-			updateMixer();
+			
+			// Мгновенно меняем громкость, если источник активен
+			const active = activeSources.get(device.deviceId);
+			if (active && active.gainNode) {
+				active.gainNode.gain.value = val / 100;
+			}
+			
+			saveState(); // сохраняем в хранилище
 		});
 	});
 }
