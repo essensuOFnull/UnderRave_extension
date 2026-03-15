@@ -261,3 +261,35 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   min-width: 40px !important;
   margin-left: 4px; /* небольшой отступ от левого края */
 }
+/*улучшение вида изображений при открытии*/
+[role="dialog"] {
+  all: unset !important;
+  position: fixed !important;
+  top: 0 !important;
+  left: 0 !important;
+  width: 100vw !important;
+  height: 100vh !important;
+  overflow: scroll !important;
+  text-align: center !important;
+  white-space: nowrap !important;
+  z-index: 2147483645 !important;
+  pointer-events: all !important;
+}
+
+[role="dialog"]::before {
+  content: '' !important;
+  display: inline-block !important;
+  height: 100% !important;
+  vertical-align: middle !important;
+  margin-right: -0.25em !important; /* коррекция для inline-block */
+}
+
+[role="dialog"] img {
+  all: unset !important;
+  display: inline-block !important;
+  vertical-align: middle !important;
+  width: auto !important;
+  height: auto !important;
+  max-width: none !important;
+  max-height: none !important;
+}
