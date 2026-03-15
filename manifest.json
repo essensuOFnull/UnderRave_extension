@@ -1,7 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "刀口亼右户仨亼レ仨",
-	"version": "3.3.3",
+	"version": "3.3.4",
 	"description": "Набор улучшений для сайтов и браузера Google Chrome, разработанный для членов Подбредья.",
 	"permissions": [
 		"tabs",
