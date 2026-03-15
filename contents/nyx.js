@@ -375,41 +375,22 @@ document.querySelectorAll('img').forEach(img => {
   observer.observe(document.body, { childList: true, subtree: true });
 })();
 
-// Перемещение панели пользователя в начало контейнера ввода сообщения
-(function moveUserPanel() {
-  function performMove() {
-    // Находим панель пользователя
-    const userPanel = document.querySelector('div.absolute.bottom-2.left-2.w-\\[356px\\].z-1.flex.flex-col.gap-1');
-    // Находим контейнер ввода сообщения (родительский div с классом w-full p-2)
-    const messageContainer = document.querySelector('div.w-full.p-2');
-
-    if (userPanel && messageContainer) {
-      // Перемещаем панель в начало контейнера (prepend)
-      messageContainer.prepend(userPanel);
-      
-      // Убираем классы абсолютного позиционирования, чтобы панель встала в нормальный поток
-      userPanel.classList.remove('absolute', 'bottom-2', 'left-2');
-      
-      // Добавляем отступ снизу, чтобы не прилипало к полю ввода (опционально)
-      userPanel.style.marginBottom = '8px';
-      
-      // Можно также добавить класс для дополнительной стилизации
-      // userPanel.classList.add('nyx-user-panel-repositioned');
-      
-      console.log('Панель пользователя перемещена в контейнер ввода');
-      return true;
+// Отслеживаем высоту панели пользователя и устанавливаем CSS-переменную
+(function observeUserPanelHeight() {
+  const TARGET_SELECTOR = 'div.absolute.bottom-2.left-2.w-\\[356px\\]';
+  
+  function updateHeightVariable() {
+    const panel = document.querySelector(TARGET_SELECTOR);
+    if (panel) {
+      const height = panel.offsetHeight;
+      document.documentElement.style.setProperty('--user-panel-height', height + 'px');
     }
-    return false;
   }
 
-  // Пытаемся выполнить перемещение сразу, если элементы уже есть
-  if (!performMove()) {
-    // Если нет — ждём появления элементов через MutationObserver
-    const observer = new MutationObserver(() => {
-      if (performMove()) {
-        observer.disconnect(); // прекращаем наблюдение после успеха
-      }
-    });
-    observer.observe(document.body, { childList: true, subtree: true });
-  }
+  updateHeightVariable();
+  
+  const observer = new MutationObserver(updateHeightVariable);
+  observer.observe(document.body, { childList: true, subtree: true, attributes: true });
+  
+  window.addEventListener('resize', updateHeightVariable);
 })();

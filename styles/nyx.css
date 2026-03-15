@@ -169,3 +169,18 @@ div.w-\[356px\].z-1.flex.flex-col.gap-1 {
   justify-content: flex-end !important;
   width: 100% !important;
 }
+
+/* Фиксируем панель пользователя внизу экрана, но ниже интерфейса */
+div.absolute.bottom-2.left-2.w-\[356px\] {
+  position: fixed !important;
+  bottom: 0px !important;
+  left: 0px !important;
+  right: 0px !important;
+  width: auto !important;
+}
+
+/* Поднимаем основной интерфейс (контейнеры страниц) выше панели */
+.home {
+  margin-bottom: var(--user-panel-height, 100px) !important;
+  max-height: calc(100vh - var(--user-panel-height, 100px)) !important;
+}
