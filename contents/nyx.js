@@ -394,3 +394,109 @@ document.querySelectorAll('img').forEach(img => {
   
   window.addEventListener('resize', updateHeightVariable);
 })();
+
+// Добавление кнопок для возврата/скрытия панелей (toggle)
+(function addRestoreButtons() {
+  const BUTTONS_CONTAINER_CLASS = 'nyx-restore-buttons';
+  const NAVBAR_SELECTOR = '.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0';
+  const MEMBERS_SELECTOR = '.members-list'; // сама панель участников, а не список
+
+  // ---- Левая панель (серверная / друзья) ----
+  function toggleLeftPanels() {
+    const sidebar = document.querySelector('.server-page__sidebar');
+    const friends = document.querySelector('.dashboard > div');
+    const sidebarHidden = sidebar?.classList.contains('nyx-sidebar-hidden');
+    const friendsHidden = friends?.classList.contains('nyx-friends-hidden');
+
+    // Если хотя бы одна левая панель открыта (не скрыта) → закрываем все левые панели
+    if ((sidebar && !sidebarHidden) || (friends && !friendsHidden)) {
+      if (sidebar && !sidebarHidden) sidebar.classList.add('nyx-sidebar-hidden');
+      if (friends && !friendsHidden) friends.classList.add('nyx-friends-hidden');
+    } else {
+      // Иначе все закрыты → открываем все существующие левые панели
+      if (sidebar && sidebarHidden) sidebar.classList.remove('nyx-sidebar-hidden');
+      if (friends && friendsHidden) friends.classList.remove('nyx-friends-hidden');
+    }
+  }
+
+  // ---- Правая панель (участники) ----
+  function toggleMembers() {
+    const members = document.querySelector('.server-page__members');
+    if (!members) return;
+    if (members.classList.contains('nyx-members-hidden')) {
+      members.classList.remove('nyx-members-hidden');
+    } else {
+      members.classList.add('nyx-members-hidden');
+    }
+  }
+
+  function addLeftButton() {
+    const navbar = document.querySelector(NAVBAR_SELECTOR);
+    if (!navbar) return;
+    if (navbar.querySelector('.' + BUTTONS_CONTAINER_CLASS)) return; // уже есть
+
+    const container = document.createElement('div');
+    container.className = BUTTONS_CONTAINER_CLASS;
+
+    const leftBtn = document.createElement('button');
+    leftBtn.className = 'nyx-restore-btn left-btn';
+    leftBtn.setAttribute('aria-label', 'Переключить левую панель');
+    leftBtn.innerHTML = '☰';
+    leftBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleLeftPanels();
+    });
+
+    container.appendChild(leftBtn);
+    navbar.appendChild(container);
+  }
+
+  function addRightButton() {
+    const membersPanel = document.querySelector(MEMBERS_SELECTOR);
+    if (!membersPanel) return;
+    // Проверяем, есть ли уже контейнер с кнопкой
+    if (membersPanel.querySelector('.' + BUTTONS_CONTAINER_CLASS)) return;
+
+    const container = document.createElement('div');
+    container.className = BUTTONS_CONTAINER_CLASS;
+
+    const rightBtn = document.createElement('button');
+    rightBtn.className = 'nyx-restore-btn right-btn';
+    rightBtn.setAttribute('aria-label', 'Переключить панель участников');
+    rightBtn.innerHTML = '☰';
+    rightBtn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      toggleMembers();
+    });
+
+    container.appendChild(rightBtn);
+    membersPanel.appendChild(container);
+  }
+
+  function initButtons() {
+    addLeftButton();
+    addRightButton();
+  }
+
+  // Запуск при загрузке
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', initButtons);
+  } else {
+    initButtons();
+  }
+
+  // Наблюдатель на случай динамической подгрузки контента (SPA)
+  const observer = new MutationObserver(() => {
+    // Левая кнопка может отсутствовать после перерисовки навбара
+    const navbar = document.querySelector(NAVBAR_SELECTOR);
+    if (navbar && !navbar.querySelector('.' + BUTTONS_CONTAINER_CLASS)) {
+      addLeftButton();
+    }
+    // Правая кнопка может отсутствовать после перерисовки панели участников
+    const membersPanel = document.querySelector(MEMBERS_SELECTOR);
+    if (membersPanel && !membersPanel.querySelector('.' + BUTTONS_CONTAINER_CLASS)) {
+      addRightButton();
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true });
+})();

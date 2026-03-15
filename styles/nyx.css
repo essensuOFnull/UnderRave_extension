@@ -190,3 +190,53 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   margin-bottom: var(--user-panel-height, 100px) !important;
   max-height: calc(100vh - var(--user-panel-height, 100px)) !important;
 }
+
+/* Кнопки возврата панелей (для мобильных) */
+.nyx-restore-buttons {
+  display: flex !important;
+  justify-content: space-around !important;
+  padding: 8px 4px !important;
+  gap: 4px !important;
+  border-top: 1px solid var(--nyx-divider-background, #333) !important;
+  margin-top: auto !important; /* прижимаем к низу, если контейнер flex-колонка */
+}
+
+.nyx-restore-btn {
+  background: var(--nyx-background-darker, #2d2d2d) !important;
+  color: var(--nyx-font-main, #eee) !important;
+  border: none !important;
+  border-radius: 4px !important;
+  padding: 8px 12px !important;
+  font-size: 14px !important;
+  cursor: pointer !important;
+  flex: 1 !important;
+  transition: background 0.2s !important;
+  min-width: 40px !important;
+  text-align: center !important;
+  z-index:2147483647 !important;
+  pointer-events: all !important;
+}
+
+.nyx-restore-btn:hover {
+  background: var(--nyx-background-channels-hover, #404040) !important;
+}
+
+/* Если контейнер навигации — flex-колонка, то кнопки прижмутся к низу */
+.overflow-y-auto.h-full.bg-\(--nyx-background-darkest\).shrink-0 {
+  display: flex !important;
+  flex-direction: column !important;
+}
+/* Контейнер правой кнопки (в списке участников) */
+.members-list .nyx-restore-buttons {
+  display: flex !important;
+  justify-content: flex-start !important; /* прижимаем к левому краю */
+  margin-top: auto !important;
+}
+
+/* Правая кнопка — компактная, без растяжения */
+.members-list .nyx-restore-btn.right-btn {
+  flex: none !important;      /* отключаем растяжение */
+  width: auto !important;      /* ширина по содержимому */
+  min-width: 40px !important;            /* минимальный размер для удобства */
+  padding: 8px 12px !important;
+}
