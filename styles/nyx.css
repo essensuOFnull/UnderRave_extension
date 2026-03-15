@@ -90,6 +90,10 @@ div.overflow-y-auto.h-full.shrink-0 a{
   z-index: 0 !important;
   user-select: none !important;
   width: var(--members-width, 250px);
+  /* Добавить: */
+  display: flex !important;
+  flex-direction: column !important;
+  height: 100% !important;          /* чтобы занять всю доступную высоту */
 }
 .nyx-members-hidden {
 	margin-right: calc(var(--handle-width) - var(--members-width)) !important;
@@ -197,8 +201,9 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   justify-content: space-around !important;
   padding: 8px 4px !important;
   gap: 4px !important;
-  border-top: 1px solid var(--nyx-divider-background, #333) !important;
+  border-top: 1px solid var(--nyx-divider-background, #1E1B26) !important;
   margin-top: auto !important; /* прижимаем к низу, если контейнер flex-колонка */
+  background: var(--nyx-background-darker) !important;
 }
 
 .nyx-restore-btn {
@@ -239,4 +244,20 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   width: auto !important;      /* ширина по содержимому */
   min-width: 40px !important;            /* минимальный размер для удобства */
   padding: 8px 12px !important;
+}
+
+.server-page__members .nyx-restore-buttons {
+  display: flex !important;
+  justify-content: flex-start !important; /* кнопка слева */
+  margin-top: auto !important;             /* прижимаем к низу */
+  padding: 8px 4px !important;
+  gap: 4px !important;
+  border-top: 1px solid var(--nyx-divider-background, #333) !important;
+}
+
+.server-page__members .nyx-restore-btn {
+  flex: none !important;
+  width: auto !important;
+  min-width: 40px !important;
+  margin-left: 4px; /* небольшой отступ от левого края */
 }

@@ -399,7 +399,7 @@ document.querySelectorAll('img').forEach(img => {
 (function addRestoreButtons() {
   const BUTTONS_CONTAINER_CLASS = 'nyx-restore-buttons';
   const NAVBAR_SELECTOR = '.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0';
-  const MEMBERS_SELECTOR = '.members-list'; // сама панель участников, а не список
+  const MEMBERS_SELECTOR = '.server-page__members'; // сама панель участников, а не список
 
   // ---- Левая панель (серверная / друзья) ----
   function toggleLeftPanels() {
