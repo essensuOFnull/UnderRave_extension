@@ -1,3 +1,9 @@
+*{
+	word-break: break-all !important;
+	word-wrap: break-word !important;
+	min-width: 0 !important;
+}
+
 [role="dialog"][id="radix-:r3g:"] {
   all: unset !important;
   position: fixed !important;
