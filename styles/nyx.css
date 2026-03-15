@@ -93,57 +93,79 @@ div.overflow-y-auto.h-full.shrink-0 a{
   margin-left: calc(-1 * var(--friends-width)) !important;
 }
 
-/* Мобильная адаптация для экранов до 768px */
-@media (max-width: 768px) {
-  /* Уменьшаем боковые панели до 85% ширины экрана */
-  .server-page__sidebar,
-  .server-page__members,
-  div.w-\(--nyx-server-sidebar-width\) {
-    width: 85vw !important;
-  }
-
-  /* Скрываем некоторые второстепенные элементы */
-  .navbar__item__name:not(.logo) {
-    font-size: 14px;
-  }
-
-  /* Увеличиваем кликабельные области иконок */
-  .connection-panel-controls__icon {
-    padding: 8px !important;
-  }
-
-  /* Уменьшаем отступы в панели пользователя */
-  .absolute.bottom-2.left-2 {
-    width: 90vw !important;
-    left: 5vw !important;
-    bottom: 10px !important;
-  }
-
-  /* Подстраиваем поле ввода */
-  .w-full.p-2 {
-    padding: 8px !important;
-  }
-
-  /* Делаем шрифты немного меньше, чтобы помещалось больше информации */
-  body {
-    font-size: 14px;
-  }
+.server-page__routes{
+	max-width:calc(100vw - calc(var(--handle-width) * 2)) !important;
+	width:0 !important;
 }
 
-/* Для очень маленьких экранов (до 480px) */
-@media (max-width: 480px) {
-  .server-page__sidebar,
-  .server-page__members,
-  div.w-\(--nyx-server-sidebar-width\) {
-    width: 90vw !important;
-  }
+/* Постоянная адаптация панели пользователя и поля ввода */
+/* Растягиваем панель пользователя на всю доступную ширину */
+div.w-\[356px\].z-1.flex.flex-col.gap-1 {
+  width: 100% !important;
+  max-width: 100% !important;
+}
 
-  .navbar {
-    padding: 2px !important;
-  }
+/* Разрешаем перенос иконок в панели пользователя */
+.connection-panel-controls {
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+  gap: 4px !important;
+}
 
-  .navbar__item {
-    width: 40px !important;
-    height: 40px !important;
-  }
+/* Разрешаем перенос кнопок в поле ввода (скрепка, смайлик, GIF, отправка) */
+.flex.items-center.gap-2.flex-shrink-0.self-end {
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+
+/* Уменьшаем отступы в контейнере поля ввода, чтобы больше помещалось */
+.p-3 {
+  padding: 8px !important;
+}
+
+/* Подсказки про Enter/Shift+Enter — переносим на новую строку при необходимости */
+.px-3.py-2 .flex.items-center.gap-4 {
+  flex-wrap: wrap !important;
+}
+
+/* Само поле ввода — делаем чуть компактнее */
+[data-slate-editor] {
+  min-height: 24px !important;
+  line-height: 24px !important;
+  font-size: 14px !important;
+}
+
+/* Адаптивность панели пользователя: перенос иконок под ник/статус при необходимости */
+.bg-\(--nyx-background-user-panel\) .flex.items-center.justify-between {
+  flex-wrap: wrap !important;
+  gap: 8px !important;
+}
+
+/* Адаптивность поля ввода: перенос кнопок под поле ввода */
+.w-full.p-2 .flex.items-center.gap-3.p-3 {
+  flex-wrap: wrap !important;
+}
+
+/* Разрешаем перенос внутри блока кнопок */
+.w-full.p-2 .flex.items-center.gap-2.flex-shrink-0.self-end {
+  flex-wrap: wrap !important;
+  justify-content: flex-end !important;
+}
+
+/* Поле ввода: кнопки всегда под текстом */
+.w-full.p-2 .flex.items-center.gap-3.p-3 {
+  flex-direction: column !important;
+  align-items: stretch !important;
+}
+
+/* Поле ввода занимает всю ширину */
+.w-full.p-2 .flex-1 {
+  width: 100% !important;
+}
+
+/* Блок кнопок выравниваем по правому краю и растягиваем на всю ширину */
+.w-full.p-2 .flex.items-center.gap-2.flex-shrink-0.self-end {
+  align-self: flex-end !important;
+  justify-content: flex-end !important;
+  width: 100% !important;
 }
