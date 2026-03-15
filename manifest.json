@@ -17,7 +17,10 @@
 		"<all_urls>"
 	],
 	"web_accessible_resources": [{
-		"resources": ["web_accessible_resources/**/*"],
+		"resources": [
+			"web_accessible_resources/**/*",
+			"styles/nyx.css"
+		],
 		"matches": ["<all_urls>"]
 	}],
 	"action": {
@@ -53,7 +56,7 @@
 			"matches": ["*://nyx-app.ru/*"],
 			"js": ["contents/nyx.js"],
 			"css": ["styles/nyx.css"],
-			"run_at": "document_start",
+			"run_at": "document_end",
 			"all_frames": true
 		}
 	]

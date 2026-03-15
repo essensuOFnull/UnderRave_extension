@@ -1,4 +1,4 @@
-[role="dialog"] {
+[role="dialog"][id="radix-:r3g:"] {
   all: unset !important;
   position: fixed !important;
   top: 0 !important;
@@ -12,7 +12,7 @@
   pointer-events: all !important;
 }
 
-[role="dialog"]::before {
+[role="dialog"][id="radix-:r3g:"]::before {
   content: '' !important;
   display: inline-block !important;
   height: 100% !important;
@@ -20,7 +20,7 @@
   margin-right: -0.25em !important; /* коррекция для inline-block */
 }
 
-[role="dialog"] img {
+[role="dialog"][id="radix-:r3g:"] img.w-full.h-full.object-contain.cursor-pointer {
   all: unset !important;
   display: inline-block !important;
   vertical-align: middle !important;
@@ -28,4 +28,24 @@
   height: auto !important;
   max-width: none !important;
   max-height: none !important;
+}
+
+/* styles/nyx.css */
+.nyx-download-btn {
+  display: inline-block;
+  background: #2d2d2d;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 4px 8px;
+  margin-left: 8px;
+  font-size: 12px;
+  cursor: pointer;
+}
+.nyx-download-btn:hover {
+  background: #404040;
+}
+/*отключаем лишнее элементы'*/
+div.px-3.py-2,div.border-b.px-4.py-3.flex.items-center.gap-3{
+	display:none;
 }
