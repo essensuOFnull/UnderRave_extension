@@ -139,36 +139,53 @@ document.querySelectorAll('img').forEach(img => {
   if (window._nyxEncodedMap.has(img.src)) addDownloadButton(img);
 });
 
-// Sidebar and members swipe functionality
+// Sidebar, members and friends panel swipe functionality
 (function() {
-  function initSwipe() {
+  let handlersAdded = false;
+
+  // Функция для измерения ширины панелей и установки CSS-переменных
+  function setupPanels() {
     const sidebar = document.querySelector('.server-page__sidebar');
     const members = document.querySelector('.server-page__members');
+    const friendsPanel = document.querySelector('div.w-\\(--nyx-server-sidebar-width\\).h-full.flex.flex-col.gap-2.p-4.bg-\\(--nyx-background-darker\\).pb-\\[calc\\(var\\(--nyx-control-panel-height\\)\\+16px\\)\\]');
     const handleElement = document.querySelector('.overflow-y-auto.h-full.shrink-0');
-    
-    if (!sidebar || !members) {
-      return; // повторим позже через MutationObserver
+
+    if (sidebar) {
+      const w = sidebar.offsetWidth;
+      document.documentElement.style.setProperty('--sidebar-width', w + 'px');
+      sidebar.style.transition = 'margin-left 0.3s ease';
     }
-    // Получаем ширины
-    const sidebarWidth = sidebar.offsetWidth;
-    const membersWidth = members.offsetWidth;
-    const handleWidth = handleElement.offsetWidth;
+    if (members) {
+      const w = members.offsetWidth;
+      document.documentElement.style.setProperty('--members-width', w + 'px');
+      members.style.transition = 'margin-right 0.3s ease';
+    }
+    if (friendsPanel) {
+      const w = friendsPanel.offsetWidth;
+      document.documentElement.style.setProperty('--friends-width', w + 'px');
+      friendsPanel.style.transition = 'margin-left 0.3s ease';
+    }
+    if (handleElement) {
+      const w = handleElement.offsetWidth;
+      document.documentElement.style.setProperty('--handle-width', w + 'px');
+    }
+  }
 
-    // Устанавливаем CSS-переменные
-    document.documentElement.style.setProperty('--sidebar-width', sidebarWidth + 'px');
-    document.documentElement.style.setProperty('--members-width', membersWidth + 'px');
-    document.documentElement.style.setProperty('--handle-width', handleWidth + 'px');
+  // Добавляем обработчики событий только один раз
+  function addSwipeHandlers() {
+    if (handlersAdded) return;
+    handlersAdded = true;
 
-    // Добавляем transition для плавности
-    sidebar.style.transition = 'margin-left 0.3s ease';
-    members.style.transition = 'transform 0.3s ease';
-
-    // --- Обработчики событий ---
     let startX, startY;
     let isSwiping = false;
     let startElement = null;
     let swipeProcessed = false;
     const SWIPE_THRESHOLD = 20;
+
+    const sidebarSelector = '.server-page__sidebar';
+    const membersSelector = '.server-page__members';
+    const friendsSelector = 'div.w-\\(--nyx-server-sidebar-width\\).h-full.flex.flex-col.gap-2.p-4.bg-\\(--nyx-background-darker\\).pb-\\[calc\\(var\\(--nyx-control-panel-height\\)\\+16px\\)\\]';
+    const handleSelector = '.overflow-y-auto.h-full.shrink-0';
 
     function onTouchStart(e) {
       const touch = e.touches[0];
@@ -188,11 +205,13 @@ document.querySelectorAll('img').forEach(img => {
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
         e.preventDefault();
 
-        const inSidebar = startElement.closest('.server-page__sidebar');
-        const inMembers = startElement.closest('.server-page__members');
+        const inSidebar = startElement.closest(sidebarSelector);
+        const inMembers = startElement.closest(membersSelector);
+        const inFriends = startElement.closest(friendsSelector);
+        const inHandle = startElement.closest(handleSelector);
 
         if (inSidebar) {
-          // Левая панель
+          const sidebar = document.querySelector(sidebarSelector);
           if (deltaX < 0) {
             sidebar.classList.add('nyx-sidebar-hidden');
             swipeProcessed = true;
@@ -200,14 +219,44 @@ document.querySelectorAll('img').forEach(img => {
             sidebar.classList.remove('nyx-sidebar-hidden');
             swipeProcessed = true;
           }
+        } else if (inFriends) {
+          const friends = document.querySelector(friendsSelector);
+          if (deltaX < 0) {
+            friends.classList.add('nyx-friends-hidden');
+            swipeProcessed = true;
+          } else if (deltaX > 0 && friends.classList.contains('nyx-friends-hidden')) {
+            friends.classList.remove('nyx-friends-hidden');
+            swipeProcessed = true;
+          }
         } else if (inMembers) {
-          // Правая панель
+          const members = document.querySelector(membersSelector);
           if (deltaX > 0) {
             members.classList.add('nyx-members-hidden');
             swipeProcessed = true;
           } else if (deltaX < 0 && members.classList.contains('nyx-members-hidden')) {
             members.classList.remove('nyx-members-hidden');
             swipeProcessed = true;
+          }
+        } else if (inHandle) {
+          // Свайп на ручке: показываем соответствующую панель
+          if (deltaX > 0) {
+            // Показать левую панель (sidebar или friends), если скрыта
+            const sidebar = document.querySelector(sidebarSelector);
+            const friends = document.querySelector(friendsSelector);
+            if (sidebar && sidebar.classList.contains('nyx-sidebar-hidden')) {
+              sidebar.classList.remove('nyx-sidebar-hidden');
+              swipeProcessed = true;
+            } else if (friends && friends.classList.contains('nyx-friends-hidden')) {
+              friends.classList.remove('nyx-friends-hidden');
+              swipeProcessed = true;
+            }
+          } else if (deltaX < 0) {
+            // Показать правую панель (members), если скрыта
+            const members = document.querySelector(membersSelector);
+            if (members && members.classList.contains('nyx-members-hidden')) {
+              members.classList.remove('nyx-members-hidden');
+              swipeProcessed = true;
+            }
           }
         }
       }
@@ -235,10 +284,13 @@ document.querySelectorAll('img').forEach(img => {
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
         e.preventDefault();
 
-        const inSidebar = startElement.closest('.server-page__sidebar');
-        const inMembers = startElement.closest('.server-page__members');
+        const inSidebar = startElement.closest(sidebarSelector);
+        const inMembers = startElement.closest(membersSelector);
+        const inFriends = startElement.closest(friendsSelector);
+        const inHandle = startElement.closest(handleSelector);
 
         if (inSidebar) {
+          const sidebar = document.querySelector(sidebarSelector);
           if (deltaX < 0) {
             sidebar.classList.add('nyx-sidebar-hidden');
             swipeProcessed = true;
@@ -246,13 +298,41 @@ document.querySelectorAll('img').forEach(img => {
             sidebar.classList.remove('nyx-sidebar-hidden');
             swipeProcessed = true;
           }
+        } else if (inFriends) {
+          const friends = document.querySelector(friendsSelector);
+          if (deltaX < 0) {
+            friends.classList.add('nyx-friends-hidden');
+            swipeProcessed = true;
+          } else if (deltaX > 0 && friends.classList.contains('nyx-friends-hidden')) {
+            friends.classList.remove('nyx-friends-hidden');
+            swipeProcessed = true;
+          }
         } else if (inMembers) {
+          const members = document.querySelector(membersSelector);
           if (deltaX > 0) {
             members.classList.add('nyx-members-hidden');
             swipeProcessed = true;
           } else if (deltaX < 0 && members.classList.contains('nyx-members-hidden')) {
             members.classList.remove('nyx-members-hidden');
             swipeProcessed = true;
+          }
+        } else if (inHandle) {
+          if (deltaX > 0) {
+            const sidebar = document.querySelector(sidebarSelector);
+            const friends = document.querySelector(friendsSelector);
+            if (sidebar && sidebar.classList.contains('nyx-sidebar-hidden')) {
+              sidebar.classList.remove('nyx-sidebar-hidden');
+              swipeProcessed = true;
+            } else if (friends && friends.classList.contains('nyx-friends-hidden')) {
+              friends.classList.remove('nyx-friends-hidden');
+              swipeProcessed = true;
+            }
+          } else if (deltaX < 0) {
+            const members = document.querySelector(membersSelector);
+            if (members && members.classList.contains('nyx-members-hidden')) {
+              members.classList.remove('nyx-members-hidden');
+              swipeProcessed = true;
+            }
           }
         }
       }
@@ -264,7 +344,6 @@ document.querySelectorAll('img').forEach(img => {
       swipeProcessed = false;
     }
 
-    // Регистрируем события
     document.addEventListener('touchstart', onTouchStart, { passive: false });
     document.addEventListener('touchmove', onTouchMove, { passive: false });
     document.addEventListener('touchend', onTouchEnd);
@@ -273,14 +352,9 @@ document.querySelectorAll('img').forEach(img => {
     document.addEventListener('mouseup', onMouseUp);
   }
 
-  // Пытаемся инициализировать при появлении элементов
   function tryInit() {
-    const sidebar = document.querySelector('.server-page__sidebar');
-    const members = document.querySelector('.server-page__members');
-    const handle = document.querySelector('.overflow-y-auto.h-full.shrink-0');
-    if (sidebar && members && handle) {
-      initSwipe();
-    }
+    setupPanels();
+    addSwipeHandlers();
   }
 
   if (document.readyState === 'loading') {
