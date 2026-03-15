@@ -292,4 +292,5 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   height: auto !important;
   max-width: none !important;
   max-height: none !important;
+  image-rendering: pixelated !important;
 }
