@@ -139,27 +139,37 @@ document.querySelectorAll('img').forEach(img => {
   if (window._nyxEncodedMap.has(img.src)) addDownloadButton(img);
 });
 
-// Sidebar swipe functionality
+// Sidebar and members swipe functionality
 (function() {
-  let sidebarSwipeInitialized = false;
+  function initSwipe() {
+    const sidebar = document.querySelector('.server-page__sidebar');
+    const members = document.querySelector('.server-page__members');
+    const handleElement = document.querySelector('.overflow-y-auto.h-full.shrink-0');
+    
+    if (!sidebar || !members) {
+      return; // повторим позже через MutationObserver
+    }
+    // Получаем ширины
+    const sidebarWidth = sidebar.offsetWidth;
+    const membersWidth = members.offsetWidth;
+    const handleWidth = handleElement.offsetWidth;
 
-  function initSidebarSwipe(sidebar, trigger) {
-    if (sidebarSwipeInitialized) return;
-    sidebarSwipeInitialized = true;
-	// Запоминаем ширину панели и записываем её в CSS-переменную
-	const sidebarWidth = sidebar.offsetWidth;
-	document.documentElement.style.setProperty('--sidebar-width', sidebarWidth + 'px');
+    // Устанавливаем CSS-переменные
+    document.documentElement.style.setProperty('--sidebar-width', sidebarWidth + 'px');
+    document.documentElement.style.setProperty('--members-width', membersWidth + 'px');
+    document.documentElement.style.setProperty('--handle-width', handleWidth + 'px');
 
-    // Обеспечиваем плавность анимации
-    sidebar.style.transition = 'transform 0.3s ease';
+    // Добавляем transition для плавности
+    sidebar.style.transition = 'margin-left 0.3s ease';
+    members.style.transition = 'transform 0.3s ease';
 
+    // --- Обработчики событий ---
     let startX, startY;
     let isSwiping = false;
     let startElement = null;
     let swipeProcessed = false;
     const SWIPE_THRESHOLD = 20;
 
-    // --- Обработчики для touch (мобильные) ---
     function onTouchStart(e) {
       const touch = e.touches[0];
       startX = touch.clientX;
@@ -176,20 +186,29 @@ document.querySelectorAll('img').forEach(img => {
       const deltaY = touch.clientY - startY;
 
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
-        e.preventDefault(); // предотвращаем прокрутку страницы
+        e.preventDefault();
 
-        const startInSidebar = startElement.closest('.server-page__sidebar');
-        // Исправленный селектор с экранированием скобок
-        const startInTrigger = startElement.closest('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
+        const inSidebar = startElement.closest('.server-page__sidebar');
+        const inMembers = startElement.closest('.server-page__members');
 
-        if (startInSidebar && deltaX < 0) {
-          // Свайп влево по боковой панели → скрыть
-          sidebar.classList.add('nyx-sidebar-hidden');
-          swipeProcessed = true;
-        } else if (startInTrigger && deltaX > 0) {
-          // Свайп вправо по триггеру → показать
-          sidebar.classList.remove('nyx-sidebar-hidden');
-          swipeProcessed = true;
+        if (inSidebar) {
+          // Левая панель
+          if (deltaX < 0) {
+            sidebar.classList.add('nyx-sidebar-hidden');
+            swipeProcessed = true;
+          } else if (deltaX > 0 && sidebar.classList.contains('nyx-sidebar-hidden')) {
+            sidebar.classList.remove('nyx-sidebar-hidden');
+            swipeProcessed = true;
+          }
+        } else if (inMembers) {
+          // Правая панель
+          if (deltaX > 0) {
+            members.classList.add('nyx-members-hidden');
+            swipeProcessed = true;
+          } else if (deltaX < 0 && members.classList.contains('nyx-members-hidden')) {
+            members.classList.remove('nyx-members-hidden');
+            swipeProcessed = true;
+          }
         }
       }
     }
@@ -200,7 +219,6 @@ document.querySelectorAll('img').forEach(img => {
       swipeProcessed = false;
     }
 
-    // --- Обработчики для мыши (десктоп) ---
     function onMouseDown(e) {
       startX = e.clientX;
       startY = e.clientY;
@@ -217,15 +235,25 @@ document.querySelectorAll('img').forEach(img => {
       if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
         e.preventDefault();
 
-        const startInSidebar = startElement.closest('.server-page__sidebar');
-        const startInTrigger = startElement.closest('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
+        const inSidebar = startElement.closest('.server-page__sidebar');
+        const inMembers = startElement.closest('.server-page__members');
 
-        if (startInSidebar && deltaX < 0) {
-          sidebar.classList.add('nyx-sidebar-hidden');
-          swipeProcessed = true;
-        } else if (startInTrigger && deltaX > 0) {
-          sidebar.classList.remove('nyx-sidebar-hidden');
-          swipeProcessed = true;
+        if (inSidebar) {
+          if (deltaX < 0) {
+            sidebar.classList.add('nyx-sidebar-hidden');
+            swipeProcessed = true;
+          } else if (deltaX > 0 && sidebar.classList.contains('nyx-sidebar-hidden')) {
+            sidebar.classList.remove('nyx-sidebar-hidden');
+            swipeProcessed = true;
+          }
+        } else if (inMembers) {
+          if (deltaX > 0) {
+            members.classList.add('nyx-members-hidden');
+            swipeProcessed = true;
+          } else if (deltaX < 0 && members.classList.contains('nyx-members-hidden')) {
+            members.classList.remove('nyx-members-hidden');
+            swipeProcessed = true;
+          }
         }
       }
     }
@@ -245,27 +273,22 @@ document.querySelectorAll('img').forEach(img => {
     document.addEventListener('mouseup', onMouseUp);
   }
 
-  // Поиск элементов и инициализация
-  function tryInitSidebarSwipe() {
-    if (sidebarSwipeInitialized) return;
+  // Пытаемся инициализировать при появлении элементов
+  function tryInit() {
     const sidebar = document.querySelector('.server-page__sidebar');
-    // Исправленный селектор для триггера
-    const trigger = document.querySelector('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
-    if (sidebar && trigger) {
-      initSidebarSwipe(sidebar, trigger);
+    const members = document.querySelector('.server-page__members');
+    const handle = document.querySelector('.overflow-y-auto.h-full.shrink-0');
+    if (sidebar && members && handle) {
+      initSwipe();
     }
   }
 
-  // Запускаем при готовности DOM
   if (document.readyState === 'loading') {
-    document.addEventListener('DOMContentLoaded', tryInitSidebarSwipe);
+    document.addEventListener('DOMContentLoaded', tryInit);
   } else {
-    tryInitSidebarSwipe();
+    tryInit();
   }
 
-  // Дополнительный наблюдатель на случай динамического появления элементов
-  const sidebarObserver = new MutationObserver(() => {
-    tryInitSidebarSwipe();
-  });
-  sidebarObserver.observe(document.body, { childList: true, subtree: true });
+  const observer = new MutationObserver(tryInit);
+  observer.observe(document.body, { childList: true, subtree: true });
 })();

@@ -66,4 +66,18 @@ div.px-3.py-2,div.border-b.px-4.py-3.flex.items-center.gap-3{
 div.overflow-y-auto.h-full.shrink-0 {
   z-index: 1 !important;
   user-select: none !important;
+  pointer-events: none !important;
+}
+div.overflow-y-auto.h-full.shrink-0 a{
+  pointer-events: all !important;
+}
+/* Правая панель участников */
+.server-page__members {
+  transition: margin-right 0.3s ease !important;
+  z-index: 0 !important;
+  user-select: none !important;
+  width: var(--members-width, 250px);
+}
+.nyx-members-hidden {
+	margin-right: calc(var(--handle-width) - var(--members-width)) !important;
 }
