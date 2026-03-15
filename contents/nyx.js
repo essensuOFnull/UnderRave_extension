@@ -1,6 +1,14 @@
 // contents/nyx.js
 // lib/png-encoder.js
 console.log('nyx.js: START');
+
+// Устанавливаем viewport для мобильных устройств, если его нет
+if (!document.querySelector('meta[name="viewport"]')) {
+  const meta = document.createElement('meta');
+  meta.name = 'viewport';
+  meta.content = 'width=device-width, initial-scale=1.0';
+  document.head.appendChild(meta);
+}
 async function encodeFileToPNG(file) {
   const arrayBuffer = await file.arrayBuffer();
   const bytes = new Uint8Array(arrayBuffer);
