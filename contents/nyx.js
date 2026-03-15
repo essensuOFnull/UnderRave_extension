@@ -138,3 +138,134 @@ observer.observe(document.body, { childList: true, subtree: true });
 document.querySelectorAll('img').forEach(img => {
   if (window._nyxEncodedMap.has(img.src)) addDownloadButton(img);
 });
+
+// Sidebar swipe functionality
+(function() {
+  let sidebarSwipeInitialized = false;
+
+  function initSidebarSwipe(sidebar, trigger) {
+    if (sidebarSwipeInitialized) return;
+    sidebarSwipeInitialized = true;
+	// Запоминаем ширину панели и записываем её в CSS-переменную
+	const sidebarWidth = sidebar.offsetWidth;
+	document.documentElement.style.setProperty('--sidebar-width', sidebarWidth + 'px');
+
+    // Обеспечиваем плавность анимации
+    sidebar.style.transition = 'transform 0.3s ease';
+
+    let startX, startY;
+    let isSwiping = false;
+    let startElement = null;
+    let swipeProcessed = false;
+    const SWIPE_THRESHOLD = 20;
+
+    // --- Обработчики для touch (мобильные) ---
+    function onTouchStart(e) {
+      const touch = e.touches[0];
+      startX = touch.clientX;
+      startY = touch.clientY;
+      isSwiping = true;
+      swipeProcessed = false;
+      startElement = e.target;
+    }
+
+    function onTouchMove(e) {
+      if (!isSwiping || swipeProcessed) return;
+      const touch = e.touches[0];
+      const deltaX = touch.clientX - startX;
+      const deltaY = touch.clientY - startY;
+
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+        e.preventDefault(); // предотвращаем прокрутку страницы
+
+        const startInSidebar = startElement.closest('.server-page__sidebar');
+        // Исправленный селектор с экранированием скобок
+        const startInTrigger = startElement.closest('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
+
+        if (startInSidebar && deltaX < 0) {
+          // Свайп влево по боковой панели → скрыть
+          sidebar.classList.add('nyx-sidebar-hidden');
+          swipeProcessed = true;
+        } else if (startInTrigger && deltaX > 0) {
+          // Свайп вправо по триггеру → показать
+          sidebar.classList.remove('nyx-sidebar-hidden');
+          swipeProcessed = true;
+        }
+      }
+    }
+
+    function onTouchEnd() {
+      isSwiping = false;
+      startElement = null;
+      swipeProcessed = false;
+    }
+
+    // --- Обработчики для мыши (десктоп) ---
+    function onMouseDown(e) {
+      startX = e.clientX;
+      startY = e.clientY;
+      isSwiping = true;
+      swipeProcessed = false;
+      startElement = e.target;
+    }
+
+    function onMouseMove(e) {
+      if (!isSwiping || swipeProcessed) return;
+      const deltaX = e.clientX - startX;
+      const deltaY = e.clientY - startY;
+
+      if (Math.abs(deltaX) > Math.abs(deltaY) && Math.abs(deltaX) > SWIPE_THRESHOLD) {
+        e.preventDefault();
+
+        const startInSidebar = startElement.closest('.server-page__sidebar');
+        const startInTrigger = startElement.closest('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
+
+        if (startInSidebar && deltaX < 0) {
+          sidebar.classList.add('nyx-sidebar-hidden');
+          swipeProcessed = true;
+        } else if (startInTrigger && deltaX > 0) {
+          sidebar.classList.remove('nyx-sidebar-hidden');
+          swipeProcessed = true;
+        }
+      }
+    }
+
+    function onMouseUp() {
+      isSwiping = false;
+      startElement = null;
+      swipeProcessed = false;
+    }
+
+    // Регистрируем события
+    document.addEventListener('touchstart', onTouchStart, { passive: false });
+    document.addEventListener('touchmove', onTouchMove, { passive: false });
+    document.addEventListener('touchend', onTouchEnd);
+    document.addEventListener('mousedown', onMouseDown);
+    document.addEventListener('mousemove', onMouseMove);
+    document.addEventListener('mouseup', onMouseUp);
+  }
+
+  // Поиск элементов и инициализация
+  function tryInitSidebarSwipe() {
+    if (sidebarSwipeInitialized) return;
+    const sidebar = document.querySelector('.server-page__sidebar');
+    // Исправленный селектор для триггера
+    const trigger = document.querySelector('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
+    if (sidebar && trigger) {
+      initSidebarSwipe(sidebar, trigger);
+    }
+  }
+
+  // Запускаем при готовности DOM
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', tryInitSidebarSwipe);
+  } else {
+    tryInitSidebarSwipe();
+  }
+
+  // Дополнительный наблюдатель на случай динамического появления элементов
+  const sidebarObserver = new MutationObserver(() => {
+    tryInitSidebarSwipe();
+  });
+  sidebarObserver.observe(document.body, { childList: true, subtree: true });
+})();
