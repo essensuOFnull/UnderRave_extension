@@ -500,3 +500,104 @@ document.querySelectorAll('img').forEach(img => {
   });
   observer.observe(document.body, { childList: true, subtree: true });
 })();
+
+// Уведомления о новых сообщениях на основе класса navbar__item_has-unread-messages
+(function() {
+    if (!('Notification' in window)) {
+        console.log('[Nyx] Уведомления не поддерживаются');
+        return;
+    }
+
+    if (Notification.permission !== 'granted' && Notification.permission !== 'denied') {
+        Notification.requestPermission();
+    }
+
+    // Множество серверов, для которых уже показано уведомление (по названию из title)
+    const notifiedServers = new Set();
+
+    // Извлечение информации о сервере из элемента
+    function getServerInfo(el) {
+        const title = el.getAttribute('title');
+        const style = el.getAttribute('style');
+        let iconUrl = null;
+        if (style) {
+            const match = style.match(/url\(["']?([^"')]+)["']?\)/);
+            if (match) iconUrl = match[1];
+        }
+        if (!iconUrl) {
+            iconUrl = 'https://cdn.nyx-app.ru/favicon.ico';
+        }
+        return { title, iconUrl };
+    }
+
+    // Проверяет все элементы с классом и показывает уведомления для новых
+    function checkUnreadServers() {
+        const items = document.querySelectorAll('.navbar__item_has-unread-messages');
+        items.forEach(el => {
+            const { title, iconUrl } = getServerInfo(el);
+            if (title && !notifiedServers.has(title)) {
+                notifiedServers.add(title);
+                try {
+                    new Notification(`${title}`, {
+                        body: 'Есть непрочитанные сообщения',
+                        icon: iconUrl,
+                        silent: false,
+                        tag: 'nyx-unread-server'
+                    });
+                } catch (e) {
+                    console.warn('[Nyx] Ошибка показа уведомления', e);
+                }
+            }
+        });
+    }
+
+    // Очищает множество уведомлённых для серверов, у которых класс исчез
+    function cleanNotified() {
+        const currentTitles = new Set(
+            Array.from(document.querySelectorAll('.navbar__item_has-unread-messages'))
+                .map(el => el.getAttribute('title'))
+                .filter(t => t)
+        );
+        for (let title of notifiedServers) {
+            if (!currentTitles.has(title)) {
+                notifiedServers.delete(title);
+            }
+        }
+    }
+
+    // Поиск контейнера левой панели (где находятся иконки серверов)
+    function getNavbarContainer() {
+        return document.querySelector('.overflow-y-auto.h-full.bg-\\(--nyx-background-darkest\\).shrink-0');
+    }
+
+    function initObserver() {
+        const container = getNavbarContainer();
+        if (!container) {
+            setTimeout(initObserver, 2000);
+            return;
+        }
+
+        console.log('[Nyx] Наблюдение за непрочитанными сообщениями запущено');
+
+        // Первоначальная проверка (если уже есть непрочитанные)
+        checkUnreadServers();
+
+        const observer = new MutationObserver(() => {
+            checkUnreadServers();
+            cleanNotified();
+        });
+
+        observer.observe(container, {
+            childList: true,
+            subtree: true,
+            attributes: true,
+            attributeFilter: ['class']
+        });
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initObserver);
+    } else {
+        initObserver();
+    }
+})();
