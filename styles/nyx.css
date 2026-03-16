@@ -262,7 +262,7 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   margin-left: 4px; /* небольшой отступ от левого края */
 }
 /*улучшение вида изображений при открытии*/
-[role="dialog"] {
+[role="dialog"]:not([id="radix-:r4:"]){
   all: unset !important;
   position: fixed !important;
   top: 0 !important;
@@ -276,7 +276,7 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   pointer-events: all !important;
 }
 
-[role="dialog"]::before {
+[role="dialog"]:not([id="radix-:r4:"])::before {
   content: '' !important;
   display: inline-block !important;
   height: 100% !important;
@@ -284,7 +284,7 @@ div.absolute.bottom-2.left-2.w-\[356px\] {
   margin-right: -0.25em !important; /* коррекция для inline-block */
 }
 
-[role="dialog"] img {
+[role="dialog"]:not([id="radix-:r4:"]) img {
   all: unset !important;
   display: inline-block !important;
   vertical-align: middle !important;
