@@ -1,6 +1,7 @@
 {
 	"manifest_version": 3,
 	"name": "刀口亼右户仨亼レ仨",
+	"author": "essensuOFnull",
 	"version": "3.4.1",
 	"description": "Набор улучшений для сайтов и браузера Google Chrome, разработанный для членов Подбредья.",
 	"permissions": [
@@ -43,11 +44,40 @@
 		{
 			"matches": ["<all_urls>"],
 			"js": [
+				"libs/jquery-3.3.1.slim.min.js",
+				"libs/sha/sha256.js",
+				"libs/aes-js/index.js",
+				"libs/base64/base64js.min.js",
+				"libs/encoding/encoding.js",
+				"libs/scrypt/scrypt.js",
+				"libs/scrypt/thirdparty/unorm.js",
+				"libs/scrypt/thirdparty/buffer.js",
+				"libs/scrypt/thirdparty/setImmediate.js",
+				"libs/keyexchange/jsbn.js",
+				"libs/keyexchange/jsbn2.js",
+				"libs/keyexchange/prng4.js",
+				"libs/keyexchange/rng.js",
+				"libs/keyexchange/ec.js",
+				"libs/keyexchange/sec.js",
+
 				"contents/context_menu.js",
 				"contents/video_search.js",
 				"contents/lifting_restrictions.js",
 				"contents/pip_handler.js",
-				"contents/media_mixer.js"
+				"contents/media_mixer.js",
+				
+				"contents/encrypt/configuration.js",
+				"contents/encrypt/index.js",
+				"contents/encrypt/header-module.js",
+				"contents/encrypt/text-module.js",
+				"contents/encrypt/pre-module.js",
+				"contents/encrypt/presend-module.js",
+				"contents/encrypt/storage.js",
+				"contents/encrypt/encrypt-module.js",
+				"contents/encrypt/time-module.js",
+				"contents/encrypt/navigation-module.js",
+				"contents/encrypt/keyexchange-module.js",
+				"contents/encrypt/error-module.js"
 			],
 			"run_at": "document_start",
 			"all_frames": true
