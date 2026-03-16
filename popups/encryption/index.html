@@ -1,0 +1,46 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+	<link rel="stylesheet" href="../../index.css">
+    <link rel="stylesheet" href="./index.css">
+</head>
+<body>
+	<div class="column">
+		<h2>🔐 Настройки шифрования</h2>
+
+		<div class="setting-item">
+			<label for="encryptKey">Ключ шифрования (пароль)</label>
+			<input type="password" id="encryptKey" placeholder="Введите пароль для шифрования">
+		</div>
+
+		<div class="setting-item">
+			<label for="decryptKey">Ключ расшифровки (если отличается)</label>
+			<input type="password" id="decryptKey" placeholder="Оставьте пустым, чтобы использовать ключ шифрования">
+		</div>
+
+		<div class="setting-item checkbox">
+			<input type="checkbox" id="encryptEnabled" checked>
+			<label for="encryptEnabled">Включить шифрование исходящих сообщений</label>
+		</div>
+
+		<div class="setting-item checkbox">
+			<input type="checkbox" id="decryptEnabled" checked>
+			<label for="decryptEnabled">Включить расшифровку входящих сообщений</label>
+		</div>
+
+		<div class="setting-item">
+			<button id="saveSettings">Сохранить настройки</button>
+		</div>
+
+		<div class="note">
+			<strong>Как это работает:</strong><br>
+			- Поля ввода на сайтах заменяются на защищённые копии.<br>
+			- При отправке формы текст автоматически шифруется выбранным ключом.<br>
+			- Зашифрованные сообщения на странице расшифровываются (если включено).<br>
+			- Ключи хранятся локально и не передаются.
+		</div>
+	</div>
+    <script src="index.js"></script>
+</body>
+</html>
