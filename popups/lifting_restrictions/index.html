@@ -17,9 +17,9 @@
 
         <div class="settings-card">
             <div class="setting-item">
-                <input type="checkbox" id="removeDisablePictureInPicture">
+                <input type="checkbox" id="enablePictureInPicture">
                 <div>
-                    <label for="removeDisablePictureInPicture">Разрешить PiP для всех видео</label>
+                    <label for="enablePictureInPicture">Разрешить PiP для всех видео</label>
                     <div class="setting-description">
                         Удаляет атрибут <code>disablePictureInPicture</code> у видео,
                         позволяя использовать режим «картинка в картинке» даже если сайт запретил.
@@ -28,9 +28,9 @@
             </div>
 
             <div class="setting-item">
-                <input type="checkbox" id="removeControlsList">
+                <input type="checkbox" id="enableControlsList">
                 <div>
-                    <label for="removeControlsList">Разрешить скачивание видео</label>
+                    <label for="enableControlsList">Разрешить скачивание видео</label>
                     <div class="setting-description">
                         Убирает <code>controlslist="nodownload"</code> и другие запреты на кнопку скачивания
                         в стандартных контролах видео.
@@ -39,9 +39,9 @@
             </div>
 
             <div class="setting-item">
-                <input type="checkbox" id="removeDisableRemotePlayback">
+                <input type="checkbox" id="enableRemotePlayback">
                 <div>
-                    <label for="removeDisableRemotePlayback">Разрешить удалённое воспроизведение (Cast/AirPlay)</label>
+                    <label for="enableRemotePlayback">Разрешить удалённое воспроизведение (Cast/AirPlay)</label>
                     <div class="setting-description">
                         Удаляет атрибут <code>disableRemotePlayback</code>, позволяя использовать Chromecast, AirPlay и т.д.
                     </div>
@@ -49,20 +49,9 @@
             </div>
 
             <div class="setting-item">
-                <input type="checkbox" id="removeContextMenuBlock">
+                <input type="checkbox" id="enableXWebkitAirplay">
                 <div>
-                    <label for="removeContextMenuBlock">Разблокировать контекстное меню на видео</label>
-                    <div class="setting-description">
-                        Убирает атрибуты <code>oncontextmenu</code> и обработчики, блокирующие правый клик на видео.
-                        (Не конфликтует с модулем принудительного меню.)
-                    </div>
-                </div>
-            </div>
-
-            <div class="setting-item">
-                <input type="checkbox" id="removeXWebkitAirplay">
-                <div>
-                    <label for="removeXWebkitAirplay">Разрешить AirPlay (для Safari)</label>
+                    <label for="enableXWebkitAirplay">Разрешить AirPlay (для Safari)</label>
                     <div class="setting-description">
                         Удаляет атрибут <code>x-webkit-airplay="deny"</code>, разрешая AirPlay на устройствах Apple.
                     </div>

@@ -1,6 +1,5 @@
 (function() {
 	window.lastContextMenuTarget = null;
-	window.forceContextMenuEnabled = false;
 	window.lastContextMenuEvent = null;
 
 	function handleContextMenu(e) {
@@ -18,13 +17,13 @@
 
 	window.addEventListener('contextmenu', handleContextMenu, true);
 
-	chrome.storage.sync.get('contextMenuAvailablerEnabled', (data) => {
-		window.forceContextMenuEnabled = data.contextMenuAvailablerEnabled !== false;
+	chrome.storage.sync.get('enableDefaultContextMenu', (data) => {
+		window.forceContextMenuEnabled = data.enableDefaultContextMenu!==false;
 	});
 
 	chrome.storage.onChanged.addListener((changes, area) => {
-		if (area === 'sync' && changes.contextMenuAvailablerEnabled) {
-		window.forceContextMenuEnabled = changes.contextMenuAvailablerEnabled.newValue !== false;
+		if (area === 'sync' && changes.enableDefaultContextMenu) {
+			window.forceContextMenuEnabled = changes.enableDefaultContextMenu.newValue;
 		}
 	});
 

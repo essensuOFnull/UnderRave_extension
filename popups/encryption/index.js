@@ -6,7 +6,7 @@ function saveSettings() {
     const decryptEnabled = document.getElementById('decryptEnabled').checked;
     const protectInput = document.getElementById('protectInput').checked;
 
-    chrome.storage.local.set({
+    chrome.storage.sync.set({
         encryptKey,
         decryptKey: decryptKey || encryptKey,
         encryptEnabled,
@@ -17,7 +17,7 @@ function saveSettings() {
 
 // Загрузка при старте
 document.addEventListener('DOMContentLoaded', () => {
-    chrome.storage.local.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
+    chrome.storage.sync.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
         document.getElementById('encryptKey').value = result.encryptKey || '';
         document.getElementById('decryptKey').value = result.decryptKey || '';
         document.getElementById('encryptEnabled').checked = result.encryptEnabled !== false;

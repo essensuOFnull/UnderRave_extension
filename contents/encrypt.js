@@ -236,13 +236,6 @@
     encryptModule.generateKey(new TextEncoder().encode(""));
 
     // ==================== Основной код расширения ====================
-    let extensionConfig = {
-        encryptKey: '',
-        decryptKey: '',
-        encryptEnabled: true,
-        decryptEnabled: true,
-        protectInput: true
-    };
     const fieldData = new WeakMap();
     let inputObserver = null;
     let decryptObserver = null;
@@ -252,7 +245,7 @@
         encryptModule.generateKey(new TextEncoder().encode(password), path);
     }
 
-    chrome.storage.local.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
+    chrome.storage.sync.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
         extensionConfig = { ...extensionConfig, ...result };
         if (!extensionConfig.decryptKey && extensionConfig.encryptKey) {
             extensionConfig.decryptKey = extensionConfig.encryptKey;

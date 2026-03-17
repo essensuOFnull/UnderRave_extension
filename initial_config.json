@@ -1,0 +1,13 @@
+{
+    "enablePictureInPicture": true,
+    "enableControlsList": true,
+    "enableRemotePlayback": true,
+    "enableDefaultContextMenu": true,
+    "enableXWebkitAirplay": true,
+    "enableSiteContextMenu": true,
+    "encryptKey": "12345678",
+    "decryptKey": "12345678",
+    "encryptEnabled": false,
+    "decryptEnabled": true,
+    "protectInput": false
+}

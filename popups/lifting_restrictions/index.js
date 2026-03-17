@@ -1,10 +1,9 @@
 // Список всех настроек модуля
 const settings = [
-    'removeDisablePictureInPicture',
-    'removeControlsList',
-    'removeDisableRemotePlayback',
-    'removeContextMenuBlock',
-    'removeXWebkitAirplay'
+    'enablePictureInPicture',
+    'enableControlsList',
+    'enableRemotePlayback',
+    'enableXWebkitAirplay'
 ];
 
 // Загрузка состояний
@@ -12,8 +11,7 @@ chrome.storage.sync.get(settings, (data) => {
     settings.forEach(id => {
         const checkbox = document.getElementById(id);
         if (checkbox) {
-            // По умолчанию все опции включены (true), если не задано иное
-            checkbox.checked = data[id] !== false;
+            checkbox.checked = data[id]!==false;
         }
     });
 });

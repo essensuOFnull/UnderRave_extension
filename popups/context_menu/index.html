@@ -13,20 +13,28 @@
 
         <div class="settings-card">
             <div class="setting-item">
-                <input type="checkbox" id="forceContextMenuCheckbox">
+                <input type="checkbox" id="enableDefaultContextMenuCheckbox">
                 <div>
-                    <label for="forceContextMenuCheckbox">Принудительно показывать стандартное контекстное меню</label>
+                    <label for="enableDefaultContextMenuCheckbox">Принудительно показывать стандартное контекстное меню</label>
                     <div class="setting-description">
                         Блокирует попытки сайтов отключить контекстное меню (например, в видеоплеерах).
                         Стандартное меню будет появляться всегда.
                     </div>
                 </div>
             </div>
-
-            <div class="setting-item">
-                <input type="checkbox" id="pipMenuItemCheckbox">
+			<div class="setting-item">
+                <input type="checkbox" id="enableSiteContextMenuCheckbox">
                 <div>
-                    <label for="pipMenuItemCheckbox">Показывать пункт «Включить режим картинка в картинке»</label>
+                    <label for="enableSiteContextMenuCheckbox">Показывать пункт «Показать оригинальное меню сайта»</label>
+                    <div class="setting-description">
+                        Добавляет пункт, открывающий контекстное меню сайта, будто пункт выше выключен.
+                    </div>
+                </div>
+            </div>
+            <div class="setting-item">
+                <input type="checkbox" id="enablePictureInPictureCheckbox">
+                <div>
+                    <label for="enablePictureInPictureCheckbox">Показывать пункт «Включить режим картинка в картинке»</label>
                     <div class="setting-description">
                         Добавляет в контекстное меню пункт для запуска PiP для ближайшего видео.
                         Работает на любых сайтах, даже если видео спрятано в теневом DOM.
