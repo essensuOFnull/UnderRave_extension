@@ -1130,9 +1130,33 @@ document.getElementById('listen-volume')?.addEventListener('input', (e) => {
 	if (listenGainNode) listenGainNode.gain.value = val / 100;
 });
 
-document.getElementById('fullscreen-window-btn')?.addEventListener('click', () => {
-	window.parent.postMessage({ action: 'enterFullWindow' }, '*');
-	document.body.classList.add('fullscreen-mode');
+document.getElementById('fullscreen-window-btn')?.addEventListener('click', async () => {
+    try {
+        // 1. Получаем ID текущей вкладки (микшера)
+        const [currentTab] = await chrome.tabs.query({ active: true, currentWindow: true });
+        if (!currentTab) throw new Error('Не удалось найти текущую вкладку');
+
+        // 2. Создаём новую вкладку плеера и получаем её ID
+        const playerTab = await chrome.tabs.create({
+            url: chrome.runtime.getURL('popups/media_mixer/player.html'),
+            active: true
+        });
+
+        // 3. Получаем streamId для захвата текущей вкладки, указывая потребителя
+        const streamId = await chrome.tabCapture.getMediaStreamId({
+            targetTabId: currentTab.id,
+            consumerTabId: playerTab.id
+        });
+
+        // 4. Передаём streamId в плеер через обновление URL (или через сообщение)
+        await chrome.tabs.update(playerTab.id, {
+            url: chrome.runtime.getURL('popups/media_mixer/player.html') + '?streamId=' + encodeURIComponent(streamId)
+        });
+
+    } catch (error) {
+        console.error('Ошибка открытия плеера:', error);
+        alert('Не удалось открыть плеер. Подробности в консоли.');
+    }
 });
 
 document.addEventListener('keydown', (e) => {
@@ -1148,5 +1172,14 @@ window.addEventListener('beforeunload', () => {
     if (compositeAnimationFrame) {
         cancelAnimationFrame(compositeAnimationFrame);
         compositeAnimationFrame = null;
+    }
+});
+
+// После инициализации compositeStream (где-то после его создания)
+window.addEventListener('message', (event) => {
+    if (event.data.type === 'REQUEST_STREAM') {
+        if (compositeStream) {
+            event.source.postMessage({ type: 'STREAM', stream: compositeStream }, '*');
+        }
     }
 });
