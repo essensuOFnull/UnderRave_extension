@@ -1,0 +1,356 @@
+/* popups/media_mixer/index.css */
+/* Специфичные стили для видео/аудио микшера в тёмной теме */
+
+/* ===== Область предпросмотра ===== */
+#preview-container {
+    margin: 20px 0;
+    background: #000;
+    border-radius: 18px 18px 0 0;
+    overflow: hidden;
+    position: relative;
+    box-shadow: var(--shadow);
+}
+
+#preview-video {
+    width: 100%;
+    max-height: 300px;
+    object-fit: contain;
+    background: #000;
+    display: block;
+}
+
+#fullscreen-window-btn {
+    position: absolute;
+    bottom: 10px;
+    right: 10px;
+    background: rgba(30, 30, 40, 0.8);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.2);
+    padding: 8px 16px;
+    border-radius: 30px;
+    cursor: pointer;
+    font-size: 14px;
+    backdrop-filter: blur(5px);
+    transition: background 0.2s;
+}
+
+#fullscreen-window-btn:hover {
+    background: rgba(50, 50, 70, 0.9);
+}
+
+/* ===== Устройства (микрофоны) ===== */
+.device-item {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.device-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.device-header input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: var(--accent-color);
+}
+
+.source-list {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
+    display: none;
+}
+
+.expanded .source-list {
+    display: block;
+}
+
+/* ===== Карточки источников ===== */
+.source-card {
+    background: var(--bg-card);
+    border-radius: 14px;
+    padding: 0.75rem 1rem;
+    margin-bottom: 0.5rem;
+    border: 1px solid var(--border-color);
+}
+
+.source-header {
+    display: flex;
+    align-items: center;
+    gap: 0.75rem;
+    cursor: pointer;
+}
+
+.source-header .source-icon {
+    font-size: 1.4rem;
+    width: 24px;
+    text-align: center;
+}
+
+.source-header .source-title {
+    flex: 1;
+    font-weight: 500;
+    color: var(--text-primary);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.source-details {
+    margin-left: 2rem;
+    margin-top: 0.5rem;
+}
+
+/* ===== Ползунки громкости ===== */
+.volume-slider {
+    width: 120px;
+    height: 4px;
+    accent-color: var(--accent-color);
+}
+
+.volume-value {
+    min-width: 40px;
+    font-size: 0.8rem;
+    color: var(--text-secondary);
+}
+
+/* ===== Элементы управления видео в карточке ===== */
+.video-controls {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.5rem;
+    margin-top: 0.5rem;
+    padding-top: 0.5rem;
+    border-top: 1px dashed var(--border-color);
+}
+
+.video-control-group {
+    display: flex;
+    align-items: center;
+    gap: 0.25rem;
+    font-size: 0.85rem;
+    color: var(--text-secondary);
+}
+
+.video-control-group input[type="number"] {
+    width: 60px;
+    padding: 0.2rem 0.4rem;
+    background: var(--bg-page);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    color: var(--text-primary);
+    font-size: 0.85rem;
+}
+
+.video-control-group button {
+    background: var(--bg-card-hover);
+    border: 1px solid var(--border-color);
+    border-radius: 8px;
+    padding: 0.2rem 0.6rem;
+    cursor: pointer;
+    font-size: 0.85rem;
+    color: var(--text-primary);
+    transition: background 0.2s;
+}
+
+.video-control-group button:hover {
+    background: var(--accent-color);
+    border-color: var(--accent-color);
+    color: white;
+}
+
+.remove-source {
+    background: none;
+    border: none;
+    cursor: pointer;
+    color: var(--danger);
+    font-size: 1.2rem;
+    margin-left: 0.5rem;
+    transition: color 0.2s;
+}
+
+.remove-source:hover {
+    color: var(--danger-hover);
+}
+
+/* ===== Видео-микшер ===== */
+.video-stage-wrapper {
+    position: relative;
+    padding: 100px;
+    box-sizing: border-box;
+    background: var(--bg-page);
+}
+
+.video-stage-wrapper::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: repeating-linear-gradient(
+        45deg,
+        rgba(79, 158, 255, 0.05),
+        rgba(79, 158, 255, 0.05) 10px,
+        rgba(79, 158, 255, 0.1) 10px,
+        rgba(79, 158, 255, 0.1) 20px
+    );
+    pointer-events: none;
+    z-index: 2;
+    box-sizing: border-box;
+}
+
+.video-stage {
+    position: relative;
+    width: 100%;
+    aspect-ratio: var(--stage-width, 1920) / var(--stage-height, 1080);
+    background: #111;
+    border: 2px dashed var(--border-color);
+    z-index: 2;
+}
+
+.video-layers-container {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: var(--stage-width, 1920px);
+    height: var(--stage-height, 1080px);
+    transform-origin: 0 0;
+    background: rgba(0, 0, 0, 0.2);
+    outline: 2px dashed rgba(255,255,255,0.1);
+    outline-offset: -2px;
+    z-index: 2;
+}
+
+.video-layer {
+    position: absolute;
+    display: block;
+    background: #000;
+    border: 2px solid rgba(255, 255, 255, 0.2);
+    box-sizing: border-box;
+    cursor: move;
+    user-select: none;
+    transition: border-color 0.2s;
+    z-index: 3;
+}
+
+.video-layer:hover {
+    border-color: var(--accent-color);
+}
+
+.video-layer video {
+    width: 100%;
+    height: 100%;
+    object-fit: fill;
+    pointer-events: none;
+}
+
+/* Кнопка закрытия слоя */
+.layer-close-btn {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 24px;
+    height: 24px;
+    background: rgba(0, 0, 0, 0.6);
+    color: white;
+    border: 1px solid rgba(255,255,255,0.3);
+    border-radius: 12px;
+    font-size: 14px;
+    line-height: 1;
+    text-align: center;
+    cursor: pointer;
+    z-index: 10;
+    opacity: 0;
+    transition: opacity 0.2s, background 0.2s;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+}
+
+.video-layer:hover .layer-close-btn {
+    opacity: 1;
+}
+
+.layer-close-btn:hover {
+    background: var(--danger);
+    border-color: white;
+}
+
+/* Ручки ресайза (невидимые, только курсор) */
+.resize-handle {
+    position: absolute;
+    background: transparent;
+    z-index: 5;
+}
+
+.resize-handle.top-left {
+    top: -5px;
+    left: -5px;
+    width: 10px;
+    height: 10px;
+    cursor: nw-resize;
+}
+
+.resize-handle.top {
+    top: -5px;
+    left: 5px;
+    width: calc(100% - 10px);
+    height: 10px;
+    cursor: n-resize;
+}
+
+.resize-handle.top-right {
+    top: -5px;
+    right: -5px;
+    width: 10px;
+    height: 10px;
+    cursor: ne-resize;
+}
+
+.resize-handle.left {
+    top: 5px;
+    left: -5px;
+    width: 10px;
+    height: calc(100% - 10px);
+    cursor: w-resize;
+}
+
+.resize-handle.right {
+    top: 5px;
+    right: -5px;
+    width: 10px;
+    height: calc(100% - 10px);
+    cursor: e-resize;
+}
+
+.resize-handle.bottom-left {
+    bottom: -5px;
+    left: -5px;
+    width: 10px;
+    height: 10px;
+    cursor: sw-resize;
+}
+
+.resize-handle.bottom {
+    bottom: -5px;
+    left: 5px;
+    width: calc(100% - 10px);
+    height: 10px;
+    cursor: s-resize;
+}
+
+.resize-handle.bottom-right {
+    bottom: -5px;
+    right: -5px;
+    width: 10px;
+    height: 10px;
+    cursor: se-resize;
+}
+
+/* Скрытие панели навигации в полноэкранном режиме уже есть в общем CSS */

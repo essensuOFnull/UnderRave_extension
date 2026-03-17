@@ -2,7 +2,9 @@
 <html>
 <head>
     <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <link rel="stylesheet" href="../../index.css">
+    <link rel="stylesheet" href="index.css">
     <title>刀口亼右户仨亼レ仨 🎬 Микшер</title>
 </head>
 <body>
@@ -38,16 +40,14 @@
         <!-- Внешние источники (видео + аудио) -->
         <div class="settings-card">
             <h3>🌐 Внешние источники</h3>
-            <div style="display: flex; gap: 1rem; margin-bottom: 1rem;">
-                <button id="add-screen-source-btn" class="primary-button">🖥️ Добавить вкладку/окно/экран</button>
-            </div>
+            <button id="add-screen-source-btn" class="primary-button">🖥️ Добавить вкладку/окно/экран</button>
             <!-- Список карточек источников -->
             <div id="sources-list"></div>
         </div>
 
         <!-- Видео-микшер (область для слоёв) -->
-        <div class="settings-card" style="padding: 0; overflow: hidden;">
-			<h3 style="padding: 1rem 1.5rem; margin: 0;">🎬 Видео-микшер</h3>
+        <div class="settings-card">
+			<h3>🎬 Видео-микшер</h3>
 			<div class="video-stage-wrapper">
 				<div class="video-stage" id="video-stage">
 					<div class="video-layers-container" id="video-layers-container"></div>
