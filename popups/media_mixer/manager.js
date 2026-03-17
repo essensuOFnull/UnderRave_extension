@@ -670,3 +670,8 @@ function setStageSize() {
 }
 
 window.addEventListener('resize', setStageSize);
+
+document.getElementById('pip-btn')?.addEventListener('click', () => {
+  launchViewer();
+  sendToViewer({ type: 'TOGGLE_PIP' });
+});

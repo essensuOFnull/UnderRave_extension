@@ -1,30 +1,43 @@
-// viewer.js – окно просмотра (захват и композитинг)
+// viewer.js – окно просмотра (композит через video)
 
 let managerPort = null;
 let sources = new Map();           // sourceId -> { stream, video, width, height, transform, hasAudio, audioGainNode?, audioSourceNode? }
 let devices = new Map();           // deviceId -> { stream, sourceNode, gainNode, enabled, volume }
 let audioCtx = null;
 let masterGain = null;
+let destination = null;            // MediaStreamAudioDestinationNode
 let silentSource = null;
 let animationFrame = null;
 let renderInterval = null;
-let compositeCanvas = document.getElementById('composite-canvas');
-let compositeCtx = compositeCanvas.getContext('2d');
 let stageWidth = 1920;
 let stageHeight = 1080;
+
+// Элементы
+const outputVideo = document.getElementById('output-video');
+const offscreenCanvas = document.createElement('canvas');
+offscreenCanvas.width = stageWidth;
+offscreenCanvas.height = stageHeight;
+offscreenCanvas.style.position = 'absolute';
+offscreenCanvas.style.left = '-9999px';
+offscreenCanvas.style.top = '-9999px';
+document.body.appendChild(offscreenCanvas);
+const offscreenCtx = offscreenCanvas.getContext('2d');
+
+// Поток для вывода
+let outputStream = null;
 
 // ---------- Аудио инициализация ----------
 function initAudio() {
   if (audioCtx) return;
   audioCtx = new (window.AudioContext || window.webkitAudioContext)();
   masterGain = audioCtx.createGain();
-  masterGain.connect(audioCtx.destination);
+  destination = audioCtx.createMediaStreamDestination();
+  masterGain.connect(destination);
 }
 
 async function ensureAudioContext() {
   if (audioCtx && audioCtx.state === 'suspended') {
     await audioCtx.resume();
-    // После первого запуска создаём тихий источник для поддержания активности
     if (!silentSource && audioCtx.state === 'running') {
       silentSource = audioCtx.createConstantSource();
       silentSource.offset.value = 0;
@@ -32,6 +45,18 @@ async function ensureAudioContext() {
       silentSource.start();
     }
   }
+}
+
+// ---------- Инициализация видеопотока ----------
+function initOutputStream() {
+  if (outputStream) {
+    outputStream.getTracks().forEach(t => t.stop());
+  }
+  const videoTrack = offscreenCanvas.captureStream(30).getVideoTracks()[0];
+  const audioTracks = destination ? destination.stream.getAudioTracks() : [];
+  outputStream = new MediaStream([videoTrack, ...audioTracks]);
+  outputVideo.srcObject = outputStream;
+  outputVideo.play().catch(e => console.warn('play error', e));
 }
 
 // ---------- Связь с менеджером ----------
@@ -63,8 +88,25 @@ function handleManagerMessage(msg) {
     case 'SET_MASTER_VOLUME':
       if (masterGain) masterGain.gain.value = msg.volume;
       break;
+    case 'TOGGLE_PIP':
+      togglePictureInPicture();
+      break;
     default:
       console.log('Unknown message from manager:', msg);
+  }
+}
+
+// ---------- PiP ----------
+async function togglePictureInPicture() {
+  if (!outputVideo) return;
+  try {
+    if (document.pictureInPictureElement) {
+      await document.exitPictureInPicture();
+    } else {
+      await outputVideo.requestPictureInPicture();
+    }
+  } catch (err) {
+    console.error('PiP error:', err);
   }
 }
 
@@ -77,7 +119,6 @@ async function applyMixerState(devicesList, sourcesList) {
   const newDeviceIds = new Set(devicesList.filter(d => d.enabled).map(d => d.id));
   const currentDeviceIds = new Set(devices.keys());
 
-  // Удаляем отключённые
   for (let id of currentDeviceIds) {
     if (!newDeviceIds.has(id)) {
       const dev = devices.get(id);
@@ -87,7 +128,6 @@ async function applyMixerState(devicesList, sourcesList) {
     }
   }
 
-  // Добавляем новые / обновляем громкость
   for (let dev of devicesList) {
     if (dev.enabled) {
       if (!devices.has(dev.id)) {
@@ -117,9 +157,8 @@ async function applyMixerState(devicesList, sourcesList) {
   for (let src of sourcesList) {
     if (!src.hasAudio) continue;
     const source = sources.get(src.id);
-    if (!source) continue; // источник ещё не захвачен
+    if (!source) continue;
 
-    // Если аудио ещё не подключено, но поток содержит аудио – создаём
     if (!source.audioGainNode && source.stream.getAudioTracks().length > 0) {
       await ensureAudioContext();
       const sourceNode = audioCtx.createMediaStreamSource(source.stream);
@@ -130,9 +169,13 @@ async function applyMixerState(devicesList, sourcesList) {
       source.audioGainNode = gainNode;
       source.audioSourceNode = sourceNode;
     } else if (source.audioGainNode) {
-      // Обновляем громкость
       source.audioGainNode.gain.value = src.volume / 100;
     }
+  }
+
+  // При первом запуске инициализируем выходной поток
+  if (!outputStream) {
+    initOutputStream();
   }
 }
 
@@ -209,11 +252,11 @@ function reorderSources(order) {
   sources = newSources;
 }
 
-// ---------- Рендеринг (с поддержкой фоновой активности) ----------
+// ---------- Рендеринг ----------
 function startRendering() {
   stopRendering();
   if (document.hidden) {
-    renderInterval = setInterval(renderFrame, 200); // 5 fps в фоне
+    renderInterval = setInterval(renderFrame, 16); // 5 fps в фоне
   } else {
     renderLoop();
   }
@@ -236,12 +279,7 @@ function renderLoop() {
 }
 
 function renderFrame() {
-  if (compositeCanvas.width !== stageWidth || compositeCanvas.height !== stageHeight) {
-    compositeCanvas.width = stageWidth;
-    compositeCanvas.height = stageHeight;
-  }
-
-  compositeCtx.clearRect(0, 0, stageWidth, stageHeight);
+  offscreenCtx.clearRect(0, 0, stageWidth, stageHeight);
 
   for (let source of sources.values()) {
     const t = source.transform;
@@ -250,11 +288,11 @@ function renderFrame() {
     const w = t.width;
     const h = t.height;
 
-    compositeCtx.save();
-    compositeCtx.translate(x + w/2, y + h/2);
-    compositeCtx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
-    compositeCtx.drawImage(source.video, -w/2, -h/2, w, h);
-    compositeCtx.restore();
+    offscreenCtx.save();
+    offscreenCtx.translate(x + w/2, y + h/2);
+    offscreenCtx.scale(t.flipX ? -1 : 1, t.flipY ? -1 : 1);
+    offscreenCtx.drawImage(source.video, -w/2, -h/2, w, h);
+    offscreenCtx.restore();
   }
 
   // Отправляем превью в менеджер
@@ -262,7 +300,7 @@ function renderFrame() {
   previewCanvas.width = 320;
   previewCanvas.height = 180;
   const previewCtx = previewCanvas.getContext('2d');
-  previewCtx.drawImage(compositeCanvas, 0, 0, stageWidth, stageHeight, 0, 0, 320, 180);
+  previewCtx.drawImage(offscreenCanvas, 0, 0, stageWidth, stageHeight, 0, 0, 320, 180);
   previewCanvas.toBlob(blob => {
     const reader = new FileReader();
     reader.onloadend = () => {
@@ -277,7 +315,6 @@ function renderFrame() {
   }, 'image/jpeg', 0.5);
 }
 
-// Следим за видимостью страницы
 document.addEventListener('visibilitychange', () => {
   if (sources.size > 0 || devices.size > 0) {
     startRendering();
@@ -289,4 +326,5 @@ window.addEventListener('beforeunload', () => {
   if (audioCtx) audioCtx.close();
   sources.forEach(s => s.stream.getTracks().forEach(t => t.stop()));
   devices.forEach(d => d.stream.getTracks().forEach(t => t.stop()));
+  if (outputStream) outputStream.getTracks().forEach(t => t.stop());
 });
