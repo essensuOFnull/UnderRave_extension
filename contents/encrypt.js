@@ -2,11 +2,6 @@
     'use strict';
 
     // ==================== Проверка зависимостей ====================
-    // Эти библиотеки должны быть загружены до этого скрипта:
-    // - aesjs (объект aesjs)
-    // - scrypt (функция scrypt)
-    // - sha256 (объект sha256 с методом array)
-    // - base64js (объект base64js с методами fromByteArray/toByteArray)
     if (typeof aesjs === 'undefined' || typeof scrypt === 'undefined' || typeof sha256 === 'undefined' || typeof base64js === 'undefined') {
         console.error('VKEncrypt: missing required libraries (aesjs, scrypt, sha256, base64js)');
         return;
@@ -23,16 +18,16 @@
         return true;
     };
 
-    window.toInt32 = function(number) {
-        return (number + 0x100000000) % 0x100000000;
-    };
-
     window.toBytesInt32 = function(num, size = 4) {
         const arr = new Uint8Array(size);
         for (let i = 0; i < size; i++) {
             arr[i] = (num >> (8 * (size - 1 - i))) & 0xff;
         }
         return arr;
+    };
+
+    window.bytesToInt32 = function(bytes) {
+        return (bytes[0] << 24) | (bytes[1] << 16) | (bytes[2] << 8) | bytes[3];
     };
 
     // ==================== Конфигурация ====================
@@ -76,7 +71,6 @@
             if (ver === "0.1") {
                 return this.templates.base + "0.1" + this.templates.date + timeModule.getLastUnixtime() + this.templates.colon;
             } else {
-                // 0.2, 0.3, 0.4
                 return this.templates.base + ver + this.templates.date + timeModule.getLastUnixtime() + this.templates.seed + timeModule.getLastSeed() + this.templates.colon;
             }
         },
@@ -141,7 +135,7 @@
             return result;
         },
         check: function(array) {
-            const len = toInt32(array.slice(0, 4));
+            const len = bytesToInt32(array.slice(0, 4));
             const message = array.slice(36, 36 + len);
             const hash = array.slice(4, 36);
             const calculated = sha256.array(message);
@@ -253,21 +247,40 @@
     let inputObserver = null;
     let decryptObserver = null;
 
+    // Функция генерации ключа по паролю с указанием пути (encrypt/decrypt)
+    function ensureKey(password, path) {
+        if (!password) return;
+        encryptModule.generateKey(new TextEncoder().encode(password), path);
+    }
+
     // Загрузка настроек
     chrome.storage.local.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
         extensionConfig = { ...extensionConfig, ...result };
         if (!extensionConfig.decryptKey && extensionConfig.encryptKey) {
             extensionConfig.decryptKey = extensionConfig.encryptKey;
         }
+        // Генерируем ключи для шифрования и расшифровки по отдельным путям
+        ensureKey(extensionConfig.encryptKey, 'encrypt');
+        if (extensionConfig.decryptKey && extensionConfig.decryptKey !== extensionConfig.encryptKey) {
+            ensureKey(extensionConfig.decryptKey, 'decrypt');
+        } else {
+            // Если ключи совпадают, сохраняем копию в decrypt (или можно ссылаться на тот же путь)
+            ensureKey(extensionConfig.encryptKey, 'decrypt');
+        }
         startObservers();
     });
 
     chrome.storage.onChanged.addListener((changes) => {
-        if (changes.encryptKey) extensionConfig.encryptKey = changes.encryptKey.newValue;
+        if (changes.encryptKey) {
+            extensionConfig.encryptKey = changes.encryptKey.newValue;
+            ensureKey(extensionConfig.encryptKey, 'encrypt');
+        }
         if (changes.decryptKey) {
             extensionConfig.decryptKey = changes.decryptKey.newValue;
+            ensureKey(extensionConfig.decryptKey, 'decrypt');
         } else if (changes.encryptKey && !extensionConfig.decryptKey) {
             extensionConfig.decryptKey = changes.encryptKey.newValue;
+            ensureKey(extensionConfig.decryptKey, 'decrypt');
         }
         if (changes.encryptEnabled) extensionConfig.encryptEnabled = changes.encryptEnabled.newValue;
         if (changes.decryptEnabled) extensionConfig.decryptEnabled = changes.decryptEnabled.newValue;
@@ -298,7 +311,6 @@
         });
         inputObserver.observe(document.body, { childList: true, subtree: true });
 
-        // Обработка уже существующих полей
         document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]')
             .forEach(setupInputHandler);
     }
@@ -361,7 +373,7 @@
 
             if (!extensionConfig.encryptKey) {
                 console.warn('Encrypt key not set, message sent as plaintext');
-                return; // ничего не делаем, пусть отправляется как есть
+                return;
             }
 
             const encrypted = encryptMessage(textToEncrypt, extensionConfig.encryptKey);
@@ -372,19 +384,16 @@
             }
 
             if (extensionConfig.protectInput) {
-                data.realText = ''; // очищаем сохранённый текст
+                data.realText = '';
             } else {
-                // обновляем realText, чтобы он соответствовал полю
                 data.realText = encrypted;
             }
-            // Не блокируем событие, чтобы форма отправилась
             return;
         }
 
         if (!extensionConfig.protectInput) return;
         if (data.isContentEditable) return;
 
-        // Блокируем только клавиши, изменяющие текст
         const isModifier = e.ctrlKey || e.altKey || e.metaKey;
         const isNavigation = e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown';
         const isSystem = isModifier || isNavigation || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab';
@@ -474,10 +483,11 @@
 
     function encryptMessage(text, password) {
         try {
-            encryptModule.generateKey(new TextEncoder().encode(password), 'global');
+            // Используем путь 'encrypt' для ключа шифрования
+            encryptModule.generateKey(new TextEncoder().encode(password), 'encrypt');
             encryptModule.prepareForEncryption();
             const prepared = premodule.prepare(new TextEncoder().encode(text));
-            const encrypted = encryptModule.encrypt(prepared, storage.getKey('global'));
+            const encrypted = encryptModule.encrypt(prepared, storage.getKey('encrypt'));
             if (!encrypted.result) throw new Error('Encryption failed');
             const b64 = base64module.toBase64(encrypted.encrypted);
             return headerModule.addHeader(b64.message);
@@ -519,7 +529,6 @@
         });
         decryptObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-        // Обработать существующие узлы
         document.body.querySelectorAll('*').forEach(el => {
             Array.from(el.childNodes).forEach(node => {
                 if (node.nodeType === Node.TEXT_NODE && !isDecryptedHost(node.parentNode)) {
@@ -533,42 +542,59 @@
         return node && node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-decrypted');
     }
 
+    // Улучшенная версия decryptNodeWithShadow с ожиданием ключа
     function decryptNodeWithShadow(textNode) {
         if (!extensionConfig.decryptEnabled || !extensionConfig.decryptKey) return;
-        const text = textNode.textContent;
 
+        const text = textNode.textContent;
         const headerCheck = headerModule.checkHeader(text);
         if (!headerCheck.result) return;
 
-        try {
-            const decoded = base64module.fromBase64(headerCheck.message);
-            if (!decoded.result) return;
+        const decoded = base64module.fromBase64(headerCheck.message);
+        if (!decoded.result) return;
 
-            encryptModule.generateKey(new TextEncoder().encode(extensionConfig.decryptKey), 'global');
-            encryptModule.prepareForDecryption(headerCheck);
-            const decrypted = encryptModule.decrypt(decoded.bytes, storage.getKey('global'));
-            if (!decrypted.result) return;
+        // Проверяем, готов ли ключ для расшифровки
+        let key = storage.getKey('decrypt');
+        const defaultKey = storage.defaultKey; // пустой ключ (все нули)
 
-            const checked = premodule.check(decrypted.decrypted);
-            if (!checked) return;
+        // Сравниваем ключи поэлементно
+        const isKeyDefault = key.length === defaultKey.length && key.every((val, i) => val === defaultKey[i]);
 
-            const plainText = new TextDecoder().decode(checked);
-
-            const host = document.createElement('span');
-            host.setAttribute('data-decrypted', 'true');
-            host.style.display = 'inline';
-            host.style.all = 'inherit';
-
-            const shadow = host.attachShadow({ mode: 'closed' });
-            const textSpan = document.createElement('span');
-            textSpan.textContent = plainText;
-            textSpan.style.all = 'inherit';
-            shadow.appendChild(textSpan);
-
-            textNode.parentNode.replaceChild(host, textNode);
-        } catch (e) {
-            console.error('Decryption error', e);
+        if (isKeyDefault) {
+            // Ключ ещё не сгенерирован – запускаем генерацию и откладываем расшифровку
+            console.log('VKEncrypt: decrypt key not ready, retrying in 200ms');
+            ensureKey(extensionConfig.decryptKey, 'decrypt');
+            setTimeout(() => {
+                // Повторяем попытку для того же текстового узла (он всё ещё существует)
+                if (textNode.parentNode) {
+                    decryptNodeWithShadow(textNode);
+                }
+            }, 200);
+            return;
         }
+
+        // Ключ готов – выполняем расшифровку
+        encryptModule.prepareForDecryption(headerCheck);
+        const decrypted = encryptModule.decrypt(decoded.bytes, key);
+        if (!decrypted.result) return;
+
+        const checked = premodule.check(decrypted.decrypted);
+        if (!checked) return;
+
+        const plainText = new TextDecoder().decode(checked);
+
+        const host = document.createElement('span');
+        host.setAttribute('data-decrypted', 'true');
+        host.style.display = 'inline';
+        host.style.all = 'inherit';
+
+        const shadow = host.attachShadow({ mode: 'closed' });
+        const textSpan = document.createElement('span');
+        textSpan.textContent = plainText;
+        textSpan.style.all = 'inherit';
+        shadow.appendChild(textSpan);
+
+        textNode.parentNode.replaceChild(host, textNode);
     }
 
     // Экспорт для отладки
