@@ -29,15 +29,16 @@
         encryptKey: '',
         decryptKey: '',
         encryptEnabled: true,
-        decryptEnabled: true
+        decryptEnabled: true,
+        protectInput: true // новая опция
     };
-    const fieldData = new WeakMap(); // поле -> { realText, isContentEditable }
+    const fieldData = new WeakMap(); // поле -> { realText, isContentEditable, handlers }
 
     let inputObserver = null;
     let decryptObserver = null;
 
-    // Загрузка настроек и запуск
-    chrome.storage.local.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled'], (result) => {
+    // Загрузка настроек
+    chrome.storage.local.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
         config = { ...config, ...result };
         startObservers();
     });
@@ -47,6 +48,9 @@
         if (changes.decryptKey) config.decryptKey = changes.decryptKey.newValue;
         if (changes.encryptEnabled) config.encryptEnabled = changes.encryptEnabled.newValue;
         if (changes.decryptEnabled) config.decryptEnabled = changes.decryptEnabled.newValue;
+        if (changes.protectInput) config.protectInput = changes.protectInput.newValue;
+
+        // При изменении protectInput можно переинициализировать поля (здесь не реализовано для простоты)
     });
 
     function startObservers() {
@@ -70,12 +74,10 @@
                         findInputs(node).forEach(setupInputHandler);
                     }
                 });
-                // При удалении полей чистим WeakMap автоматически, ничего делать не нужно
             });
         });
         inputObserver.observe(document.body, { childList: true, subtree: true });
 
-        // Обрабатываем уже существующие поля
         document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]')
             .forEach(setupInputHandler);
     }
@@ -94,7 +96,7 @@
         return inputs;
     }
 
-    // ==================== НАСТРОЙКА ОБРАБОТЧИКА НА ПОЛЕ ====================
+    // ==================== НАСТРОЙКА ПОЛЯ ====================
     function setupInputHandler(field) {
         if (fieldData.has(field) || !config.encryptEnabled) return;
         if (field.hasAttribute('data-encrypt-input')) return;
@@ -102,31 +104,39 @@
 
         const isContentEditable = field.isContentEditable || field.getAttribute('contenteditable') === 'true';
 
-        // Сохраняем начальный текст
+        // Сохраняем начальный текст (для protectInput)
+        const initialText = isContentEditable ? field.innerText : field.value;
         fieldData.set(field, {
-            realText: isContentEditable ? field.innerText : field.value,
+            realText: initialText,
             isContentEditable
         });
 
-        // Перехватываем нажатия клавиш в фазе захвата (до других обработчиков)
+        // Всегда вешаем обработчик Enter (нужен для отправки)
         field.addEventListener('keydown', handleKeyDown, { capture: true });
 
-        // Для contenteditable не блокируем остальные события, только Enter обрабатываем
-        if (!isContentEditable) {
-            // Для input/textarea блокируем также вставку, вырезание, перетаскивание
-            field.addEventListener('beforeinput', (e) => {
-                // Отменяем любые стандартные действия по вводу, кроме нашего контроля
-                if (e.inputType !== 'insertReplacementText') { // разрешаем замену через IME? сложно
-                    e.preventDefault();
+        // Если защита ввода включена — блокируем все изменения
+        if (config.protectInput) {
+            if (!isContentEditable) {
+                field.addEventListener('beforeinput', (e) => {
+                    if (e.inputType !== 'insertReplacementText') {
+                        e.preventDefault();
+                    }
+                }, { capture: true });
+                field.addEventListener('paste', handlePaste, { capture: true });
+                field.addEventListener('cut', handleCut, { capture: true });
+                field.addEventListener('drop', handleDrop, { capture: true });
+            }
+        } else {
+            // Без защиты — разрешаем обычный ввод, но отслеживаем изменения через input
+            field.addEventListener('input', (e) => {
+                const data = fieldData.get(field);
+                if (data) {
+                    data.realText = isContentEditable ? field.innerText : field.value;
                 }
             }, { capture: true });
-
-            field.addEventListener('paste', handlePaste, { capture: true });
-            field.addEventListener('cut', handleCut, { capture: true });
-            field.addEventListener('drop', handleDrop, { capture: true });
         }
 
-        // Полностью отключаем событие change для всех, разрешаем только после Enter
+        // Полностью отключаем событие change (нам не нужно)
         field.addEventListener('change', (e) => {
             e.stopImmediatePropagation();
             e.preventDefault();
@@ -141,130 +151,43 @@
 
         // Enter без Shift — отправка
         if (e.key === 'Enter' && !e.shiftKey) {
+            let textToEncrypt;
+            if (config.protectInput) {
+                textToEncrypt = data.realText;
+            } else {
+                textToEncrypt = data.isContentEditable ? field.innerText : field.value;
+            }
+
+            const encrypted = encryptMessage(textToEncrypt, config.encryptKey);
             if (data.isContentEditable) {
-                // Для contenteditable просто заменяем текст и не блокируем событие
-                const encrypted = encryptMessage(data.realText, config.encryptKey);
                 field.innerText = encrypted;
-                data.realText = ''; // очищаем после отправки
             } else {
-                // Для input/textarea
-                const encrypted = encryptMessage(data.realText, config.encryptKey);
                 field.value = encrypted;
-                data.realText = '';
-            }
-            // Не вызываем preventDefault — событие уходит дальше, форма отправится
-            return;
-        }
-
-        // Все остальные клавиши блокируем для input/textarea и обрабатываем сами
-        if (!data.isContentEditable) {
-            e.preventDefault();
-
-            // Сохраняем текущее выделение
-            const start = field.selectionStart;
-            const end = field.selectionEnd;
-            let newText = data.realText;
-            let newStart = start, newEnd = end;
-
-            // Обработка специальных клавиш
-            if (e.key === 'Backspace') {
-                if (start === end) {
-                    // Удаляем один символ слева
-                    if (start > 0) {
-                        newText = newText.slice(0, start - 1) + newText.slice(end);
-                        newStart = start - 1;
-                        newEnd = start - 1;
-                    }
-                } else {
-                    // Удаляем выделенный диапазон
-                    newText = newText.slice(0, start) + newText.slice(end);
-                    newStart = start;
-                    newEnd = start;
-                }
-            } else if (e.key === 'Delete') {
-                if (start === end) {
-                    // Удаляем один символ справа
-                    if (start < newText.length) {
-                        newText = newText.slice(0, start) + newText.slice(start + 1);
-                        newStart = start;
-                        newEnd = start;
-                    }
-                } else {
-                    // Удаляем выделенный диапазон
-                    newText = newText.slice(0, start) + newText.slice(end);
-                    newStart = start;
-                    newEnd = start;
-                }
-            } else if (e.key === 'ArrowLeft' || e.key === 'ArrowRight' || e.key === 'ArrowUp' || e.key === 'ArrowDown') {
-                // Стрелки не меняют текст, но мы должны позволить нативное перемещение каретки
-                // Но мы уже вызвали preventDefault, поэтому сами установим позицию
-                // Для простоты разрешим нативное поведение, убрав preventDefault для стрелок?
-                // Однако мы уже его вызвали. Придётся эмулировать.
-                // Упрощённо: не блокируем стрелки, чтобы они работали нативно.
-                // Для этого нужно не вызывать preventDefault для стрелок.
-                // Переделаем: проверим тип клавиши в начале.
-                // Но сейчас уже поздно. Лучше переписать логику: вызывать preventDefault только для клавиш, которые мы обрабатываем сами.
-                // Я изменю подход: для input/textarea будем блокировать только те клавиши, которые изменяют текст, а стрелки оставим нативными.
-                // Это проще и сохранит стандартное поведение.
-                // Однако в задании сказано "во всех противных случаях preventDefault", но для стрелок это может быть приемлемо.
-                // Оставим так, но для стрелок не будем блокировать.
-                // Ниже я изменю код.
-            } else if (e.key.length === 1 && !e.ctrlKey && !e.altKey && !e.metaKey) {
-                // Печатный символ без модификаторов
-                const char = e.key;
-                // Вставляем символ в позицию выделения
-                newText = newText.slice(0, start) + char + newText.slice(end);
-                newStart = start + 1;
-                newEnd = start + 1;
-            } else {
-                // Остальные клавиши (Ctrl+A, Ctrl+C и т.д.) — разрешаем нативное поведение, не блокируем
-                // Для этого нужно не вызывать preventDefault, но мы уже вызвали. Переделаем.
-                return;
             }
 
-            // Обновляем поле и позицию каретки
-            field.value = newText;
-            data.realText = newText;
-            field.setSelectionRange(newStart, newEnd);
-        }
-        // Для contenteditable ничего не блокируем, кроме Enter
-    }
-
-    // Упрощённая версия: блокируем только ввод символов и Backspace/Delete, а стрелки и комбинации пропускаем
-    function handleKeyDown_v2(e) {
-        const field = e.currentTarget;
-        const data = fieldData.get(field);
-        if (!data) return;
-
-        if (e.key === 'Enter' && !e.shiftKey) {
-            if (data.isContentEditable) {
-                const encrypted = encryptMessage(data.realText, config.encryptKey);
-                field.innerText = encrypted;
-                data.realText = '';
-            } else {
-                const encrypted = encryptMessage(data.realText, config.encryptKey);
-                field.value = encrypted;
+            // Очищаем сохранённый текст, если защита включена
+            if (config.protectInput) {
                 data.realText = '';
             }
-            return; // не блокируем
+            return; // не блокируем — событие уходит дальше, форма отправится
         }
 
+        // Если защита отключена — пропускаем все остальные клавиши без блокировки
+        if (!config.protectInput) return;
+
+        // Защита включена — блокируем и обрабатываем ввод для input/textarea
         if (data.isContentEditable) {
-            // Для contenteditable ничего не блокируем, кроме Enter, но отслеживаем изменения через input
+            // Для contenteditable ничего не блокируем, но обновляем realText через input (уже есть)
             return;
         }
 
-        // Для input/textarea блокируем только те клавиши, которые меняют текст
+        // Блокируем только клавиши, изменяющие текст
         const isModifier = e.ctrlKey || e.altKey || e.metaKey;
         const isNavigation = e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown';
         const isSystem = isModifier || isNavigation || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab';
 
-        if (isSystem) {
-            // Разрешаем системные клавиши (не блокируем)
-            return;
-        }
+        if (isSystem) return; // не блокируем системные
 
-        // Блокируем и обрабатываем ввод символов, Backspace, Delete
         e.preventDefault();
 
         const start = field.selectionStart;
@@ -308,7 +231,7 @@
         field.setSelectionRange(newStart, newEnd);
     }
 
-    // Обработка вставки
+    // ==================== ВСПОМОГАТЕЛЬНЫЕ ОБРАБОТЧИКИ (для protectInput) ====================
     function handlePaste(e) {
         e.preventDefault();
         const field = e.currentTarget;
@@ -345,15 +268,12 @@
     }
 
     function handleDrop(e) {
-        e.preventDefault();
-        // Слишком сложно для примера, игнорируем
+        e.preventDefault(); // игнорируем
     }
 
     // ==================== ШИФРОВАНИЕ ====================
     function encryptMessage(text, password) {
-        // Заглушка, реальная реализация зависит от ваших модулей
-        // В вашем коде были encryptModule, premodule, base64module, headerModule, storage
-        // Предположим, они доступны глобально
+        // Заглушка — замените на реальное шифрование
         try {
             encryptModule.generateKey(new TextEncoder().encode(password), 'global');
             const prepared = premodule.prepare(new TextEncoder().encode(text));
@@ -362,20 +282,11 @@
             return headerModule.addHeader(b64.message);
         } catch (e) {
             console.error('Encryption failed', e);
-            return text; // возвращаем исходный текст в случае ошибки
+            return text;
         }
     }
 
-    // ==================== ОТСЛЕЖИВАНИЕ ИЗМЕНЕНИЙ ДЛЯ CONTENTEDITABLE ====================
-    // Для contenteditable отслеживаем input, чтобы обновлять realText
-    document.addEventListener('input', (e) => {
-        const field = e.target;
-        const data = fieldData.get(field);
-        if (!data || !data.isContentEditable) return;
-        data.realText = field.innerText;
-    }, { capture: true });
-
-    // ==================== РАСШИФРОВКА ====================
+    // ==================== РАСШИФРОВКА С SHADOW DOM ====================
     function startDecryptObserver() {
         if (decryptObserver) return;
         if (!document.body) {
@@ -391,29 +302,40 @@
                         if (node.nodeType === Node.ELEMENT_NODE) {
                             node.querySelectorAll('*').forEach(el => {
                                 Array.from(el.childNodes).forEach(child => {
-                                    if (child.nodeType === Node.TEXT_NODE) decryptNode(child);
+                                    if (child.nodeType === Node.TEXT_NODE && !isDecryptedHost(child.parentNode)) {
+                                        decryptNodeWithShadow(child);
+                                    }
                                 });
                             });
-                        } else if (node.nodeType === Node.TEXT_NODE) {
-                            decryptNode(node);
+                        } else if (node.nodeType === Node.TEXT_NODE && !isDecryptedHost(node.parentNode)) {
+                            decryptNodeWithShadow(node);
                         }
                     });
                 } else if (mutation.type === 'characterData') {
-                    decryptNode(mutation.target);
+                    const node = mutation.target;
+                    if (!isDecryptedHost(node.parentNode)) {
+                        decryptNodeWithShadow(node);
+                    }
                 }
             });
         });
         decryptObserver.observe(document.body, { childList: true, subtree: true, characterData: true });
 
-        // Обработать существующие текстовые узлы
+        // Обработать существующие узлы
         document.body.querySelectorAll('*').forEach(el => {
             Array.from(el.childNodes).forEach(node => {
-                if (node.nodeType === Node.TEXT_NODE) decryptNode(node);
+                if (node.nodeType === Node.TEXT_NODE && !isDecryptedHost(node.parentNode)) {
+                    decryptNodeWithShadow(node);
+                }
             });
         });
     }
 
-    function decryptNode(textNode) {
+    function isDecryptedHost(node) {
+        return node && node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-decrypted');
+    }
+
+    function decryptNodeWithShadow(textNode) {
         if (!config.decryptEnabled || !config.decryptKey) return;
         const text = textNode.textContent;
         const headerCheck = headerModule.checkHeader(text);
@@ -432,8 +354,25 @@
             if (!checked) return;
 
             const plainText = new TextDecoder().decode(checked);
-            textNode.textContent = plainText;
-        } catch (e) {}
+
+            // Создаём элемент-хост
+            const host = document.createElement('span');
+            host.setAttribute('data-decrypted', 'true');
+            host.style.display = 'inline';
+            host.style.all = 'inherit';
+
+            // Закрытый shadow root
+            const shadow = host.attachShadow({ mode: 'closed' });
+            const textSpan = document.createElement('span');
+            textSpan.textContent = plainText;
+            textSpan.style.all = 'inherit';
+            shadow.appendChild(textSpan);
+
+            // Заменяем текстовый узел
+            textNode.parentNode.replaceChild(host, textNode);
+        } catch (e) {
+            console.error('Decryption error', e);
+        }
     }
 
 })();

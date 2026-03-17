@@ -29,17 +29,11 @@
 			<label for="decryptEnabled">Включить расшифровку входящих сообщений</label>
 		</div>
 
-		<div class="setting-item">
-			<button id="saveSettings">Сохранить настройки</button>
+		<div class="setting-item checkbox">
+			<input type="checkbox" id="protectInput" checked>
+			<label for="protectInput">Защита ввода от браузера (скрывает набираемый текст от сайта)</label>
 		</div>
-
-		<div class="note">
-			<strong>Как это работает:</strong><br>
-			- Поля ввода на сайтах заменяются на защищённые копии.<br>
-			- При отправке формы текст автоматически шифруется выбранным ключом.<br>
-			- Зашифрованные сообщения на странице расшифровываются (если включено).<br>
-			- Ключи хранятся локально и не передаются.
-		</div>
+		<div class="note">Может не работать на некоторых сайтах.<br>При изменениях перезагрузите целевую страницу</div>
 	</div>
     <script src="index.js"></script>
 </body>
