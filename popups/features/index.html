@@ -1,24 +1,17 @@
 <!DOCTYPE html>
 <html>
 <head>
-	<meta charset="UTF-8">
-	<meta name="viewport" content="width=device-width, initial-scale=1.0">
-	<link rel="stylesheet" href="index.css">
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="../../index.css">
+	<title>刀口亼右户仨亼レ仨 ✨ Возможности</title>
 </head>
 <body>
-	<div id="main_grid">
-		<div class="tabs">
-			<button class="tab-button active" data-tab="features">Функции</button>
-			<button class="tab-button" data-tab="context_menu">Настройки контекстного меню</button>
-			<button class="tab-button" data-tab="lifting_restrictions">Снятие ограничений</button>
-			<button class="tab-button" data-tab="tv">Русское ТВ</button>
-			<button class="tab-button" data-tab="media_mixer">🎬 Видео/аудио микшер</button>
-			<button class="tab-button" data-tab="encryption">🔐 Шифрование</button>
-		</div>
-
-		<div id="features" class="tab-content active">
-			<h2>✨ Что умеет расширение</h2>
-			<div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
+    <script src="../../navigation.js"></script>
+    <div id="main_grid">
+        <div id="features">
+            <h2>✨ Что умеет расширение</h2>
+            <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1.5rem; margin-top: 1.5rem;">
 				<!-- Существующие карточки -->
 				<div class="card" style="padding: 1.5rem;">
 					<h3>📺 Русское ТВ в полном экране</h3>
@@ -99,23 +92,6 @@
 				<strong>📌 Важно:</strong> Некоторые сайты могут кэшировать поведение. Если изменения не применяются, перезагрузите страницу.
 			</div>
 		</div>
-
-		<div id="context_menu" class="tab-content">
-			<iframe src="popups/context_menu/index.html"></iframe>
-		</div>
-		<div id="lifting_restrictions" class="tab-content">
-			<iframe src="popups/lifting_restrictions/index.html"></iframe>
-		</div>
-		<div id="tv" class="tab-content">
-			<iframe src="popups/tv/index.html"></iframe>
-		</div>
-		<div id="media_mixer" class="tab-content">
-			<iframe src="popups/media_mixer/index.html"></iframe>
-		</div>
-		<div id="encryption" class="tab-content">
-            <iframe src="popups/encryption/index.html"></iframe>
-        </div>
-	</div>
-	<script src="index.js"></script>
+    </div>
 </body>
 </html>
