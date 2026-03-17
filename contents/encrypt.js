@@ -247,24 +247,20 @@
     let inputObserver = null;
     let decryptObserver = null;
 
-    // Функция генерации ключа по паролю с указанием пути (encrypt/decrypt)
     function ensureKey(password, path) {
         if (!password) return;
         encryptModule.generateKey(new TextEncoder().encode(password), path);
     }
 
-    // Загрузка настроек
     chrome.storage.local.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
         extensionConfig = { ...extensionConfig, ...result };
         if (!extensionConfig.decryptKey && extensionConfig.encryptKey) {
             extensionConfig.decryptKey = extensionConfig.encryptKey;
         }
-        // Генерируем ключи для шифрования и расшифровки по отдельным путям
         ensureKey(extensionConfig.encryptKey, 'encrypt');
         if (extensionConfig.decryptKey && extensionConfig.decryptKey !== extensionConfig.encryptKey) {
             ensureKey(extensionConfig.decryptKey, 'decrypt');
         } else {
-            // Если ключи совпадают, сохраняем копию в decrypt (или можно ссылаться на тот же путь)
             ensureKey(extensionConfig.encryptKey, 'decrypt');
         }
         startObservers();
@@ -292,6 +288,7 @@
         if (extensionConfig.decryptEnabled) startDecryptObserver();
     }
 
+    // -------------------- Шифрование (ввод) --------------------
     function startInputObserver() {
         if (inputObserver) return;
         if (!document.body) {
@@ -388,7 +385,7 @@
             } else {
                 data.realText = encrypted;
             }
-            return;
+            return; // событие продолжается – форма отправится
         }
 
         if (!extensionConfig.protectInput) return;
@@ -483,7 +480,6 @@
 
     function encryptMessage(text, password) {
         try {
-            // Используем путь 'encrypt' для ключа шифрования
             encryptModule.generateKey(new TextEncoder().encode(password), 'encrypt');
             encryptModule.prepareForEncryption();
             const prepared = premodule.prepare(new TextEncoder().encode(text));
@@ -497,6 +493,7 @@
         }
     }
 
+    // -------------------- Расшифровка (вывод) --------------------
     function startDecryptObserver() {
         if (decryptObserver) return;
         if (!document.body) {
@@ -542,9 +539,11 @@
         return node && node.nodeType === Node.ELEMENT_NODE && node.hasAttribute('data-decrypted');
     }
 
-    // Улучшенная версия decryptNodeWithShadow с ожиданием ключа
     function decryptNodeWithShadow(textNode) {
         if (!extensionConfig.decryptEnabled || !extensionConfig.decryptKey) return;
+
+        // ✨ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: не расшифровываем внутри полей ввода
+        if (textNode.parentNode && textNode.parentNode.hasAttribute('data-encrypt-input')) return;
 
         const text = textNode.textContent;
         const headerCheck = headerModule.checkHeader(text);
@@ -553,19 +552,14 @@
         const decoded = base64module.fromBase64(headerCheck.message);
         if (!decoded.result) return;
 
-        // Проверяем, готов ли ключ для расшифровки
         let key = storage.getKey('decrypt');
-        const defaultKey = storage.defaultKey; // пустой ключ (все нули)
-
-        // Сравниваем ключи поэлементно
+        const defaultKey = storage.defaultKey;
         const isKeyDefault = key.length === defaultKey.length && key.every((val, i) => val === defaultKey[i]);
 
         if (isKeyDefault) {
-            // Ключ ещё не сгенерирован – запускаем генерацию и откладываем расшифровку
             console.log('VKEncrypt: decrypt key not ready, retrying in 200ms');
             ensureKey(extensionConfig.decryptKey, 'decrypt');
             setTimeout(() => {
-                // Повторяем попытку для того же текстового узла (он всё ещё существует)
                 if (textNode.parentNode) {
                     decryptNodeWithShadow(textNode);
                 }
@@ -573,7 +567,6 @@
             return;
         }
 
-        // Ключ готов – выполняем расшифровку
         encryptModule.prepareForDecryption(headerCheck);
         const decrypted = encryptModule.decrypt(decoded.bytes, key);
         if (!decrypted.result) return;
