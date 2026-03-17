@@ -66,18 +66,7 @@
 				"contents/pip_handler.js",
 				"contents/media_mixer.js",
 				
-				"contents/encrypt/configuration.js",
-				"contents/encrypt/index.js",
-				"contents/encrypt/header-module.js",
-				"contents/encrypt/text-module.js",
-				"contents/encrypt/pre-module.js",
-				"contents/encrypt/presend-module.js",
-				"contents/encrypt/storage.js",
-				"contents/encrypt/encrypt-module.js",
-				"contents/encrypt/time-module.js",
-				"contents/encrypt/navigation-module.js",
-				"contents/encrypt/keyexchange-module.js",
-				"contents/encrypt/error-module.js"
+				"contents/encrypt.js"
 			],
 			"run_at": "document_start",
 			"all_frames": true
