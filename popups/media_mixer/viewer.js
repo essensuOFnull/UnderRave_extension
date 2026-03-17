@@ -15,7 +15,22 @@ managerPort.onDisconnect.addListener(() => {
 });
 managerPort.onMessage.addListener(handleManagerMessage);
 managerPort.postMessage({ type: 'VIEWER_READY' });
-
+function reorderSources(order) {
+    // Создаём новую Map в нужном порядке
+    const newSources = new Map();
+    order.forEach(id => {
+        if (sources.has(id)) {
+            newSources.set(id, sources.get(id));
+        }
+    });
+    // Добавляем оставшиеся (на случай рассинхронизации)
+    sources.forEach((value, id) => {
+        if (!newSources.has(id)) {
+            newSources.set(id, value);
+        }
+    });
+    sources = newSources;
+}
 function handleManagerMessage(msg) {
     switch (msg.type) {
         case 'ADD_SOURCE':
@@ -26,6 +41,9 @@ function handleManagerMessage(msg) {
             break;
         case 'UPDATE_TRANSFORM':
             updateTransform(msg.sourceId, msg.transform);
+            break;
+        case 'REORDER_SOURCES':
+            reorderSources(msg.order);
             break;
         default:
             console.log('Unknown message from manager:', msg);
@@ -38,7 +56,7 @@ async function captureSource(sourceId, sourceType, initialTransform) {
         if (sourceType === 'screen') {
             stream = await navigator.mediaDevices.getDisplayMedia({
                 video: true,
-                audio: false
+                audio: false  // аудио захватывается отдельно в manager
             });
         } else if (sourceType === 'camera') {
             stream = await navigator.mediaDevices.getUserMedia({ video: true });

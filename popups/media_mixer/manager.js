@@ -587,7 +587,10 @@ function removeSource(sourceId) {
     renderSources();
     updateLayersZIndex();
 }
-
+function syncLayerOrder() {
+    const order = videoLayers.map(l => l.sourceId);
+    sendToViewer({ type: 'REORDER_SOURCES', order });
+}
 function renderSources() {
     const container = document.getElementById('sources-list');
     if (!container) return;
@@ -701,32 +704,34 @@ function renderSources() {
                 applyLayerTransform(layer);
                 sendToViewer({ type: 'UPDATE_TRANSFORM', sourceId: source.id, transform: layer.transform });
             });
-
+			
             moveUpBtn.addEventListener('click', () => {
-                const layerIdx = videoLayers.findIndex(l => l.sourceId === source.id);
-                if (layerIdx > 0) {
-                    [videoLayers[layerIdx], videoLayers[layerIdx-1]] = [videoLayers[layerIdx-1], videoLayers[layerIdx]];
-                    const sourceIdx = mixerState.sources.findIndex(s => s.id === source.id);
-                    if (sourceIdx > 0) {
-                        [mixerState.sources[sourceIdx], mixerState.sources[sourceIdx-1]] = [mixerState.sources[sourceIdx-1], mixerState.sources[sourceIdx]];
-                    }
-                    updateLayersZIndex();
-                    renderSources();
-                }
-            });
+				const layerIdx = videoLayers.findIndex(l => l.sourceId === source.id);
+				if (layerIdx > 0) {
+					[videoLayers[layerIdx], videoLayers[layerIdx-1]] = [videoLayers[layerIdx-1], videoLayers[layerIdx]];
+					const sourceIdx = mixerState.sources.findIndex(s => s.id === source.id);
+					if (sourceIdx > 0) {
+						[mixerState.sources[sourceIdx], mixerState.sources[sourceIdx-1]] = [mixerState.sources[sourceIdx-1], mixerState.sources[sourceIdx]];
+					}
+					updateLayersZIndex();
+					renderSources();   // перерисовываем карточки
+					syncLayerOrder();  // отправляем новый порядок во viewer
+				}
+			});
 
-            moveDownBtn.addEventListener('click', () => {
-                const layerIdx = videoLayers.findIndex(l => l.sourceId === source.id);
-                if (layerIdx < videoLayers.length - 1) {
-                    [videoLayers[layerIdx], videoLayers[layerIdx+1]] = [videoLayers[layerIdx+1], videoLayers[layerIdx]];
-                    const sourceIdx = mixerState.sources.findIndex(s => s.id === source.id);
-                    if (sourceIdx < mixerState.sources.length - 1) {
-                        [mixerState.sources[sourceIdx], mixerState.sources[sourceIdx+1]] = [mixerState.sources[sourceIdx+1], mixerState.sources[sourceIdx]];
-                    }
-                    updateLayersZIndex();
-                    renderSources();
-                }
-            });
+			moveDownBtn.addEventListener('click', () => {
+				const layerIdx = videoLayers.findIndex(l => l.sourceId === source.id);
+				if (layerIdx < videoLayers.length - 1) {
+					[videoLayers[layerIdx], videoLayers[layerIdx+1]] = [videoLayers[layerIdx+1], videoLayers[layerIdx]];
+					const sourceIdx = mixerState.sources.findIndex(s => s.id === source.id);
+					if (sourceIdx < mixerState.sources.length - 1) {
+						[mixerState.sources[sourceIdx], mixerState.sources[sourceIdx+1]] = [mixerState.sources[sourceIdx+1], mixerState.sources[sourceIdx]];
+					}
+					updateLayersZIndex();
+					renderSources();
+					syncLayerOrder();
+				}
+			});
         }
     });
 }
