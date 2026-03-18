@@ -1,0 +1,17 @@
+/*отключаем лишний элемент*/
+div[role="dialog"] div[data-viewer-group="1"]{
+	display:none !important;
+}
+/*открываем на весь экран*/
+div[role="dialog"]{
+	--offset:70px;
+	width:100vw !important;
+	height:calc(100vh - var(--offset)) !important;
+	position:fixed !important;
+	left:0 !important;
+	top:var(--offset) !important;
+}
+/*убираем пустой элемент*/
+div:empty {
+  display: none !important;
+}

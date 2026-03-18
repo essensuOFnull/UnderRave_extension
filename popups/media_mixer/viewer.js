@@ -267,7 +267,7 @@ function reorderSources(order) {
 function startRendering() {
 	stopRendering();
 	if (document.hidden) {
-		renderInterval = setInterval(renderFrame, 16); // 5 fps в фоне
+		renderInterval = setInterval(renderFrame, 16);
 	} else {
 		renderLoop();
 	}
