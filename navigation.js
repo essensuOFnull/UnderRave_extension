@@ -6,7 +6,8 @@
         { id: 'lifting_restrictions', name: '🔓 Снятие ограничений', url: 'popups/lifting_restrictions/index.html' },
         { id: 'tv', name: '📺 Русское ТВ', url: 'popups/tv/index.html' },
         { id: 'media_mixer', name: '🎬 Микшер', url: 'popups/media_mixer/manager.html' },
-        { id: 'encryption', name: '🔐 Шифрование', url: 'popups/encryption/index.html' }
+        { id: 'encryption', name: '🔐 Шифрование', url: 'popups/encryption/index.html' },
+        { id: 'google', name: '🌐 Google', url: 'popups/google/index.html' }
     ];
 
     const currentPath = window.location.pathname;

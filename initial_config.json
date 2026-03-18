@@ -9,5 +9,8 @@
     "decryptKey": "12345678",
     "encryptEnabled": false,
     "decryptEnabled": true,
-    "protectInput": false
+    "protectInput": false,
+    "googleFullscreenImage": true,
+    "googleHideExtraElements": true,
+    "googleOpenImageDirectly": true
 }

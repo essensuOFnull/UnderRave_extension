@@ -2,7 +2,7 @@
 	"manifest_version": 3,
 	"name": "刀口亼右户仨亼レ仨",
 	"author": "essensuOFnull",
-	"version": "4.2.3",
+	"version": "5.0.0",
 	"description": "Набор улучшений для сайтов и браузера Google Chrome, разработанный для членов Подбредья.",
 	"permissions": [
 		"tabs",
@@ -84,7 +84,6 @@
 		},
 		{
 			"matches": ["*://www.google.com/*"],
-			"css": ["styles/google.css"],
 			"js": ["contents/google.js"],
 			"run_at": "document_end"
 		}
