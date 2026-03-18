@@ -2,6 +2,7 @@ import * as tv from './backgrounds/tv.js';
 import * as video_improver from './backgrounds/video_improver.js';
 import * as context_menu_availabler from './backgrounds/context_menu_availabler.js';
 import * as media_mixer from './backgrounds/media_mixer.js';
+import * as layout_swapper from './backgrounds/layout_swapper.js';
 
 async function loadInitialConfig() {
 	try {
@@ -24,6 +25,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 video_improver.init();
 context_menu_availabler.init();
 media_mixer.init();
+layout_swapper.init();
 /**/
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
 	if (message.action === 'openFullscreen') {

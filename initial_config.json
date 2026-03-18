@@ -12,5 +12,6 @@
     "protectInput": false,
     "googleFullscreenImage": true,
     "googleHideExtraElements": true,
-    "googleOpenImageDirectly": true
+    "googleOpenImageDirectly": true,
+    "enableLayoutSwap": true
 }
