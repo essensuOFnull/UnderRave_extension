@@ -240,199 +240,113 @@
     let inputObserver = null;
     let decryptObserver = null;
 
-    function ensureKey(password, path) {
-        if (!password) return;
-        encryptModule.generateKey(new TextEncoder().encode(password), path);
-    }
-
-    chrome.storage.sync.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
-        extensionConfig = { ...extensionConfig, ...result };
-        if (!extensionConfig.decryptKey && extensionConfig.encryptKey) {
-            extensionConfig.decryptKey = extensionConfig.encryptKey;
-        }
-        ensureKey(extensionConfig.encryptKey, 'encrypt');
-        if (extensionConfig.decryptKey && extensionConfig.decryptKey !== extensionConfig.encryptKey) {
-            ensureKey(extensionConfig.decryptKey, 'decrypt');
-        } else {
-            ensureKey(extensionConfig.encryptKey, 'decrypt');
-        }
-        startObservers();
-    });
-
-    chrome.storage.onChanged.addListener((changes) => {
-        if (changes.encryptKey) {
-            extensionConfig.encryptKey = changes.encryptKey.newValue;
-            ensureKey(extensionConfig.encryptKey, 'encrypt');
-        }
-        if (changes.decryptKey) {
-            extensionConfig.decryptKey = changes.decryptKey.newValue;
-            ensureKey(extensionConfig.decryptKey, 'decrypt');
-        } else if (changes.encryptKey && !extensionConfig.decryptKey) {
-            extensionConfig.decryptKey = changes.encryptKey.newValue;
-            ensureKey(extensionConfig.decryptKey, 'decrypt');
-        }
-        if (changes.encryptEnabled) extensionConfig.encryptEnabled = changes.encryptEnabled.newValue;
-        if (changes.decryptEnabled) extensionConfig.decryptEnabled = changes.decryptEnabled.newValue;
-        if (changes.protectInput) extensionConfig.protectInput = changes.protectInput.newValue;
-    });
-
-    function startObservers() {
-        if (extensionConfig.encryptEnabled) startInputObserver();
-        if (extensionConfig.decryptEnabled) startDecryptObserver();
-    }
-
-    // -------------------- Шифрование (ввод) --------------------
-    function startInputObserver() {
-        if (inputObserver) return;
-        if (!document.body) {
-            document.addEventListener('DOMContentLoaded', startInputObserver);
-            return;
-        }
-
-        inputObserver = new MutationObserver((mutations) => {
-            if (!extensionConfig.encryptEnabled) return;
-            mutations.forEach((mutation) => {
-                mutation.addedNodes.forEach((node) => {
-                    if (node.nodeType === Node.ELEMENT_NODE) {
-                        findInputs(node).forEach(setupInputHandler);
-                    }
-                });
-            });
-        });
-        inputObserver.observe(document.body, { childList: true, subtree: true });
-
-        document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]')
-            .forEach(setupInputHandler);
-    }
-
-    function findInputs(root) {
-        const inputs = [];
-        const selector = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]';
-        if (root.matches && root.matches(selector) && !fieldData.has(root) && !root.hasAttribute('data-encrypt-input')) {
-            inputs.push(root);
-        }
-        root.querySelectorAll(selector).forEach(el => {
-            if (!fieldData.has(el) && !el.hasAttribute('data-encrypt-input')) inputs.push(el);
-        });
-        return inputs;
-    }
-
-    function setupInputHandler(field) {
-        if (fieldData.has(field) || !extensionConfig.encryptEnabled) return;
-        if (field.hasAttribute('data-encrypt-input')) return;
-        field.setAttribute('data-encrypt-input', 'true');
-
-        const isContentEditable = field.isContentEditable || field.getAttribute('contenteditable') === 'true';
-        const initialText = isContentEditable ? field.innerText : field.value;
-        fieldData.set(field, { realText: initialText, isContentEditable });
-
-        field.addEventListener('keydown', handleKeyDown, { capture: true });
-
-        if (extensionConfig.protectInput && !isContentEditable) {
-            field.addEventListener('beforeinput', (e) => {
-                if (e.inputType !== 'insertReplacementText') e.preventDefault();
-            }, { capture: true });
-            field.addEventListener('paste', handlePaste, { capture: true });
-            field.addEventListener('cut', handleCut, { capture: true });
-            field.addEventListener('drop', handleDrop, { capture: true });
-        } else {
-            field.addEventListener('input', (e) => {
-                const data = fieldData.get(field);
-                if (data) data.realText = isContentEditable ? field.innerText : field.value;
-            }, { capture: true });
-        }
-
-        field.addEventListener('change', (e) => {
-            e.stopImmediatePropagation();
-            e.preventDefault();
-        }, { capture: true });
-    }
-
-    function handleKeyDown(e) {
+    // ==================== Обработчики событий ====================
+    function onKeyDown(e) {
         const field = e.currentTarget;
         const data = fieldData.get(field);
         if (!data) return;
 
+        // --- Обработка Enter (шифрование или просто отправка) ---
         if (e.key === 'Enter' && !e.shiftKey) {
-            let textToEncrypt;
-            if (extensionConfig.protectInput) {
-                textToEncrypt = data.realText;
+            e.preventDefault(); // Предотвратим отправку формы, пока не решим
+
+            // Получаем текст для отправки
+            let textToSend;
+            if (window.extensionConfig.protectInput) {
+                textToSend = data.realText;
             } else {
-                textToEncrypt = data.isContentEditable ? field.innerText : field.value;
+                textToSend = data.isContentEditable ? field.innerText : field.value;
             }
 
-            if (!extensionConfig.encryptKey) {
-                console.warn('Encrypt key not set, message sent as plaintext');
-                return;
-            }
-
-            const encrypted = encryptMessage(textToEncrypt, extensionConfig.encryptKey);
-            if (data.isContentEditable) {
-                field.innerText = encrypted;
-            } else {
-                field.value = encrypted;
-            }
-
-            if (extensionConfig.protectInput) {
-                data.realText = '';
-            } else {
-                data.realText = encrypted;
-            }
-            return; // событие продолжается – форма отправится
-        }
-
-        if (!extensionConfig.protectInput) return;
-        if (data.isContentEditable) return;
-
-        const isModifier = e.ctrlKey || e.altKey || e.metaKey;
-        const isNavigation = e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown';
-        const isSystem = isModifier || isNavigation || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab';
-        if (isSystem) return;
-
-        e.preventDefault();
-
-        const start = field.selectionStart;
-        const end = field.selectionEnd;
-        let newText = data.realText;
-        let newStart = start, newEnd = end;
-
-        if (e.key === 'Backspace') {
-            if (start === end) {
-                if (start > 0) {
-                    newText = newText.slice(0, start - 1) + newText.slice(end);
-                    newStart = start - 1;
-                    newEnd = start - 1;
+            // Если шифрование включено и есть ключ — шифруем
+            if (window.extensionConfig.encryptEnabled && window.extensionConfig.encryptKey) {
+                const encrypted = encryptMessage(textToSend, window.extensionConfig.encryptKey);
+                if (data.isContentEditable) {
+                    field.innerText = encrypted;
+                } else {
+                    field.value = encrypted;
+                }
+                // Обновляем realText в зависимости от protectInput
+                if (window.extensionConfig.protectInput) {
+                    data.realText = '';
+                } else {
+                    data.realText = encrypted;
                 }
             } else {
-                newText = newText.slice(0, start) + newText.slice(end);
-                newStart = start;
-                newEnd = start;
+                // Если шифрование не нужно, просто вставляем текст обратно (он мог измениться из-за protectInput)
+                if (data.isContentEditable) {
+                    field.innerText = textToSend;
+                } else {
+                    field.value = textToSend;
+                }
+                if (window.extensionConfig.protectInput) {
+                    data.realText = ''; // защита очищает realText после отправки
+                } else {
+                    data.realText = textToSend;
+                }
             }
-        } else if (e.key === 'Delete') {
-            if (start === end) {
-                if (start < newText.length) {
-                    newText = newText.slice(0, start) + newText.slice(start + 1);
+
+            // Отправляем форму (если есть)
+            setTimeout(() => {
+                const form = field.closest('form');
+                if (form) form.submit();
+            }, 0);
+            return;
+        }
+
+        // --- Обработка ввода при включённой защите (только для обычных полей, не contenteditable) ---
+        if (window.extensionConfig.protectInput && !data.isContentEditable) {
+            const isModifier = e.ctrlKey || e.altKey || e.metaKey;
+            const isNavigation = e.key.startsWith('Arrow') || e.key === 'Home' || e.key === 'End' || e.key === 'PageUp' || e.key === 'PageDown';
+            const isSystem = isModifier || isNavigation || e.key === 'Shift' || e.key === 'Control' || e.key === 'Alt' || e.key === 'Meta' || e.key === 'CapsLock' || e.key === 'Tab';
+            if (isSystem) return;
+
+            e.preventDefault();
+
+            const start = field.selectionStart;
+            const end = field.selectionEnd;
+            let newText = data.realText;
+            let newStart = start, newEnd = end;
+
+            if (e.key === 'Backspace') {
+                if (start === end) {
+                    if (start > 0) {
+                        newText = newText.slice(0, start - 1) + newText.slice(end);
+                        newStart = start - 1;
+                        newEnd = start - 1;
+                    }
+                } else {
+                    newText = newText.slice(0, start) + newText.slice(end);
                     newStart = start;
                     newEnd = start;
                 }
-            } else {
-                newText = newText.slice(0, start) + newText.slice(end);
-                newStart = start;
-                newEnd = start;
+            } else if (e.key === 'Delete') {
+                if (start === end) {
+                    if (start < newText.length) {
+                        newText = newText.slice(0, start) + newText.slice(start + 1);
+                        newStart = start;
+                        newEnd = start;
+                    }
+                } else {
+                    newText = newText.slice(0, start) + newText.slice(end);
+                    newStart = start;
+                    newEnd = start;
+                }
+            } else if (e.key.length === 1) {
+                const char = e.key;
+                newText = newText.slice(0, start) + char + newText.slice(end);
+                newStart = start + 1;
+                newEnd = start + 1;
             }
-        } else if (e.key.length === 1) {
-            const char = e.key;
-            newText = newText.slice(0, start) + char + newText.slice(end);
-            newStart = start + 1;
-            newEnd = start + 1;
-        }
 
-        field.value = newText;
-        data.realText = newText;
-        field.setSelectionRange(newStart, newEnd);
+            field.value = newText;
+            data.realText = newText;
+            field.setSelectionRange(newStart, newEnd);
+            return;
+        }
     }
 
-    function handlePaste(e) {
+    function onPaste(e) {
         e.preventDefault();
         const field = e.currentTarget;
         const data = fieldData.get(field);
@@ -450,7 +364,7 @@
         field.setSelectionRange(newPos, newPos);
     }
 
-    function handleCut(e) {
+    function onCut(e) {
         e.preventDefault();
         const field = e.currentTarget;
         const data = fieldData.get(field);
@@ -467,8 +381,176 @@
         field.setSelectionRange(start, start);
     }
 
-    function handleDrop(e) {
+    function onDrop(e) {
         e.preventDefault();
+    }
+
+    function onBeforeInput(e) {
+        if (e.inputType !== 'insertReplacementText') e.preventDefault();
+    }
+
+    function onInput(e) {
+        const field = e.currentTarget;
+        const data = fieldData.get(field);
+        if (!data) return;
+        data.realText = data.isContentEditable ? field.innerText : field.value;
+    }
+
+    function onChange(e) {
+        e.stopImmediatePropagation();
+        e.preventDefault();
+    }
+
+    function ensureKey(password, path) {
+        if (!password) return;
+        encryptModule.generateKey(new TextEncoder().encode(password), path);
+    }
+
+    // Единственный вызов для инициализации
+    chrome.storage.sync.get(['encryptKey', 'decryptKey', 'encryptEnabled', 'decryptEnabled', 'protectInput'], (result) => {
+        window.extensionConfig = { ...window.extensionConfig, ...result };
+        if (!window.extensionConfig.decryptKey && window.extensionConfig.encryptKey) {
+            window.extensionConfig.decryptKey = window.extensionConfig.encryptKey;
+        }
+        ensureKey(window.extensionConfig.encryptKey, 'encrypt');
+        if (window.extensionConfig.decryptKey && window.extensionConfig.decryptKey !== window.extensionConfig.encryptKey) {
+            ensureKey(window.extensionConfig.decryptKey, 'decrypt');
+        } else {
+            ensureKey(window.extensionConfig.encryptKey, 'decrypt');
+        }
+        // Запускаем модули после загрузки конфига
+        restartInputProtection();
+        restartDecryptObserver();
+    });
+
+    chrome.storage.onChanged.addListener((changes) => {
+        let needsRestartInput = false;
+        let needsRestartDecrypt = false;
+
+        if (changes.encryptKey) {
+            window.extensionConfig.encryptKey = changes.encryptKey.newValue;
+            ensureKey(window.extensionConfig.encryptKey, 'encrypt');
+        }
+        if (changes.decryptKey) {
+            window.extensionConfig.decryptKey = changes.decryptKey.newValue;
+            ensureKey(window.extensionConfig.decryptKey, 'decrypt');
+            needsRestartDecrypt = true;
+        } else if (changes.encryptKey && !window.extensionConfig.decryptKey) {
+            window.extensionConfig.decryptKey = changes.encryptKey.newValue;
+            ensureKey(window.extensionConfig.decryptKey, 'decrypt');
+            needsRestartDecrypt = true;
+        }
+        if (changes.encryptEnabled) {
+            window.extensionConfig.encryptEnabled = changes.encryptEnabled.newValue;
+            needsRestartInput = true;
+        }
+        if (changes.decryptEnabled) {
+            window.extensionConfig.decryptEnabled = changes.decryptEnabled.newValue;
+            needsRestartDecrypt = true;
+        }
+        if (changes.protectInput) {
+            window.extensionConfig.protectInput = changes.protectInput.newValue;
+            needsRestartInput = true;
+        }
+
+        if (needsRestartInput) {
+            restartInputProtection();
+        }
+        if (needsRestartDecrypt) {
+            restartDecryptObserver();
+        }
+    });
+
+    // -------------------- Шифрование (ввод) --------------------
+    function startInputObserver() {
+        if (inputObserver) return;
+        if (!document.body) {
+            document.addEventListener('DOMContentLoaded', startInputObserver);
+            return;
+        }
+
+        inputObserver = new MutationObserver((mutations) => {
+            // Observer работает всегда, независимо от настроек,
+            // но setupInputHandler внутри уже проверит, нужно ли что-то делать
+            mutations.forEach((mutation) => {
+                mutation.addedNodes.forEach((node) => {
+                    if (node.nodeType === Node.ELEMENT_NODE) {
+                        findInputs(node).forEach(setupInputHandler);
+                    }
+                });
+            });
+        });
+        inputObserver.observe(document.body, { childList: true, subtree: true });
+
+        // Обрабатываем уже существующие поля
+        document.querySelectorAll('input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]')
+            .forEach(setupInputHandler);
+    }
+
+    function findInputs(root) {
+        const inputs = [];
+        const selector = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]';
+        if (root.matches && root.matches(selector) && !fieldData.has(root) && !root.hasAttribute('data-encrypt-input')) {
+            inputs.push(root);
+        }
+        root.querySelectorAll(selector).forEach(el => {
+            if (!fieldData.has(el) && !el.hasAttribute('data-encrypt-input')) inputs.push(el);
+        });
+        return inputs;
+    }
+
+    function setupInputHandler(field) {
+        // Если ни одна функция не нужна, просто очищаем поле
+        if (!window.extensionConfig.encryptEnabled && !window.extensionConfig.protectInput) {
+            removeAllListeners(field);
+            fieldData.delete(field);
+            field.removeAttribute('data-encrypt-input');
+            return;
+        }
+
+        // Помечаем поле, чтобы не обрабатывать повторно в findInputs
+        field.setAttribute('data-encrypt-input', 'true');
+
+        const isContentEditable = field.isContentEditable || field.getAttribute('contenteditable') === 'true';
+        let data = fieldData.get(field);
+        if (!data) {
+            const initialText = isContentEditable ? field.innerText : field.value;
+            data = { realText: initialText, isContentEditable };
+            fieldData.set(field, data);
+        }
+
+        // Удаляем все старые обработчики
+        removeAllListeners(field);
+
+        // Всегда добавляем keydown, потому что он нужен и для Enter, и для защиты
+        field.addEventListener('keydown', onKeyDown, { capture: true });
+
+        // Специфичные для защиты обработчики (только для обычных полей ввода)
+        if (window.extensionConfig.protectInput && !isContentEditable) {
+            field.addEventListener('beforeinput', onBeforeInput, { capture: true });
+            field.addEventListener('paste', onPaste, { capture: true });
+            field.addEventListener('cut', onCut, { capture: true });
+            field.addEventListener('drop', onDrop, { capture: true });
+        } else {
+            // Если защита выключена или поле contenteditable, то обновляем realText через input
+            field.addEventListener('input', onInput, { capture: true });
+        }
+
+        // Всегда блокируем событие change
+        field.addEventListener('change', onChange, { capture: true });
+    }
+
+    function removeAllListeners(field) {
+        const events = ['keydown', 'beforeinput', 'paste', 'cut', 'drop', 'input', 'change'];
+        events.forEach(event => {
+            field.removeEventListener(event, onKeyDown, { capture: true });
+            field.removeEventListener(event, onBeforeInput, { capture: true });
+            field.removeEventListener(event, onPaste, { capture: true });
+            field.removeEventListener(event, onCut, { capture: true });
+            field.removeEventListener(event, onDrop, { capture: true });
+            field.removeEventListener(event, onInput, { capture: true });
+            field.removeEventListener(event, onChange, { capture: true });
+        });
     }
 
     function encryptMessage(text, password) {
@@ -495,7 +577,7 @@
         }
 
         decryptObserver = new MutationObserver((mutations) => {
-            if (!extensionConfig.decryptEnabled || !extensionConfig.decryptKey) return;
+            if (!window.extensionConfig.decryptEnabled || !window.extensionConfig.decryptKey) return;
             mutations.forEach((mutation) => {
                 if (mutation.type === 'childList') {
                     mutation.addedNodes.forEach((node) => {
@@ -533,9 +615,9 @@
     }
 
     function decryptNodeWithShadow(textNode) {
-        if (!extensionConfig.decryptEnabled || !extensionConfig.decryptKey) return;
+        if (!window.extensionConfig.decryptEnabled || !window.extensionConfig.decryptKey) return;
 
-        // ✨ КЛЮЧЕВОЕ ИСПРАВЛЕНИЕ: не расшифровываем внутри полей ввода
+        // Не расшифровываем внутри полей ввода
         if (textNode.parentNode && textNode.parentNode.hasAttribute('data-encrypt-input')) return;
 
         const text = textNode.textContent;
@@ -551,7 +633,7 @@
 
         if (isKeyDefault) {
             console.log('VKEncrypt: decrypt key not ready, retrying in 200ms');
-            ensureKey(extensionConfig.decryptKey, 'decrypt');
+            ensureKey(window.extensionConfig.decryptKey, 'decrypt');
             setTimeout(() => {
                 if (textNode.parentNode) {
                     decryptNodeWithShadow(textNode);
@@ -583,6 +665,43 @@
         textNode.parentNode.replaceChild(host, textNode);
     }
 
-    // Экспорт для отладки
-    window.VKEncrypt = { config: extensionConfig, encryptMessage, decryptNodeWithShadow };
+    function restartInputProtection() {
+        const selector = 'input:not([type="hidden"]):not([type="submit"]):not([type="button"]), textarea, [contenteditable="true"]';
+        const fields = document.querySelectorAll(selector);
+
+        if (window.extensionConfig.protectInput || window.extensionConfig.encryptEnabled) {
+            // Убедимся, что observer запущен (он нужен для новых полей)
+            if (!inputObserver) startInputObserver();
+            // Обновим обработчики на всех существующих полях
+            fields.forEach(field => setupInputHandler(field));
+        } else {
+            // Если ничего не включено – останавливаем observer и удаляем все наши обработчики
+            if (inputObserver) {
+                inputObserver.disconnect();
+                inputObserver = null;
+            }
+            fields.forEach(field => {
+                removeAllListeners(field);
+                fieldData.delete(field);
+                field.removeAttribute('data-encrypt-input');
+            });
+        }
+    }
+
+    function restartDecryptObserver() {
+        if (window.extensionConfig.decryptEnabled) {
+            if (!decryptObserver) startDecryptObserver();
+            // Можно перезапустить декодирование уже существующего текста, но observer обработает новые узлы
+        } else {
+            if (decryptObserver) {
+                decryptObserver.disconnect();
+                decryptObserver = null;
+            }
+            // Убираем все ранее расшифрованные блоки
+            document.querySelectorAll('[data-decrypted]').forEach(el => {
+                const textNode = document.createTextNode(el.shadowRoot?.textContent || '');
+                el.parentNode?.replaceChild(textNode, el);
+            });
+        }
+    }
 })();
