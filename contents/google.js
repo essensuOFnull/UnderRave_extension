@@ -1,4 +1,20 @@
 (function() {
+
+    // Функция проверки, находимся ли мы в разделе "Картинки"
+    function isGoogleImages() {
+        // По URL
+        if (window.location.search.includes('tbm=isch')) return true;
+        // По наличию активной кнопки "Картинки" в навигации
+        const activeTab = document.querySelector('a[aria-current="page"][href*="tbm=isch"]');
+        if (activeTab) return true;
+        // По наличию элемента, характерного только для страницы картинок
+        if (document.querySelector('[data-hveid*="CAcQ"], [jsname="j93WEe"]')) return true;
+        return false;
+    }
+
+    // Если не картинки — выходим
+    if (!isGoogleImages()) return;
+
     let clickHandler = null;
     let styleElement = null;
 
@@ -18,12 +34,20 @@
             if (fullscreen) {
                 css += `
                     div[role="dialog"] {
-                        --offset: 70px;
+                        --offset: 0px;
                         width: 100vw !important;
                         height: calc(100vh - var(--offset)) !important;
                         position: fixed !important;
                         left: 0 !important;
                         top: var(--offset) !important;
+                        z-index:2147483647 !imprtant;
+                    }
+                    body:has(div[role="dialog"]) form[action="/search"], body:has(div[role="dialog"]) span:has(form[action="/search"]){
+                        position:fixed !important;
+                        bottom:0 !important;
+                        right:0 !important;
+                        width:100% !important;
+                        z-index:9999999 !important;
                     }
                 `;
             }
